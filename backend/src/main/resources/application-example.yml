@@ -1,0 +1,141 @@
+spring:
+  application:
+    name: syllabussync
+  
+  profiles:
+    active: development
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/syllabussync
+    username: syllabussync
+    password: syllabussync_password
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+    open-in-view: false
+  
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
+            scope:
+              - openid
+              - profile
+              - email
+              - https://www.googleapis.com/auth/calendar
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v2/userinfo
+            jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+  
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  
+  cache:
+    type: redis
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+# Server configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+# Logging configuration
+logging:
+  level:
+    com.syllabussync: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_FILE:./logs/syllabussync.log}
+
+# Application specific configuration
+app:
+  jwt:
+    secret: ${JWT_SECRET:mySecretKey}
+    expiration: 86400000 # 24 hours
+  
+  file:
+    upload-dir: ${UPLOAD_DIR:./uploads}
+    max-size: ${MAX_FILE_SIZE:10MB}
+    allowed-types: pdf,docx,txt
+  
+  google:
+    calendar:
+      timezone: America/New_York
+      default-reminders:
+        - days: 7
+        - days: 3
+        - days: 1
+  
+  syllabus:
+    parsing:
+      timeout: 30000 # 30 seconds
+      max-file-size: 10485760 # 10MB
+      supported-formats: pdf,docx,txt
+  
+  notification:
+    email:
+      enabled: true
+      from: ${MAIL_FROM:noreply@syllabussync.com}
+      subject-prefix: [SyllabusSync]
+    reminder:
+      enabled: true
+      default-days: 7,3,1
