@@ -1,39 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { CssBaseline, Box, Typography, Container, Paper } from '@mui/material';
+import { CssBaseline, Box } from '@mui/material';
+import Sidebar from './components/Sidebar.tsx';
+import TopBar from './components/TopBar.tsx';
+import Dashboard from './pages/Dashboard.tsx';
+import UploadSyllabus from './pages/UploadSyllabus.tsx';
+import CalendarSync from './pages/CalendarSync.tsx';
+import Settings from './pages/Settings.tsx';
+import Login from './pages/Login.tsx';
 
-// Theme
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
-      light: '#42a5f5',
-      dark: '#1565c0',
+      main: '#4F46E5', // Indigo 600
+      light: '#EEF2FF', // Indigo 50
     },
-    secondary: {
-      main: '#dc004e',
-      light: '#ff5983',
-      dark: '#9a0036',
-    },
+    success: { main: '#22C55E' },
+    warning: { main: '#FACC15' },
+    error: { main: '#EF4444' },
     background: {
-      default: '#f5f5f5',
-      paper: '#ffffff',
+      default: '#F8FAFC',
+      paper: '#FFFFFF',
     },
   },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontSize: '2.5rem',
-      fontWeight: 600,
-    },
-    h2: {
-      fontSize: '2rem',
-      fontWeight: 600,
-    },
-    h3: {
-      fontSize: '1.75rem',
-      fontWeight: 500,
-    },
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    h1: { fontWeight: 700 },
+    h2: { fontWeight: 600 },
+    h3: { fontWeight: 600 },
   },
   components: {
     MuiButton: {
@@ -41,6 +36,7 @@ const theme = createTheme({
         root: {
           textTransform: 'none',
           borderRadius: 8,
+          fontWeight: 500,
         },
       },
     },
@@ -48,7 +44,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
         },
       },
     },
@@ -56,43 +52,38 @@ const theme = createTheme({
 });
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Mock auth
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  if (!isAuthenticated) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Login onLogin={() => setIsAuthenticated(true)} />
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-          <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="h1" color="primary" gutterBottom>
-              📚 SyllabusSync
-            </Typography>
-            <Typography variant="h3" color="text.secondary" gutterBottom>
-              Intelligent Academic Task Management
-            </Typography>
-            <Typography variant="body1" sx={{ mt: 3, mb: 4 }}>
-              Welcome to SyllabusSync! Your intelligent academic task management system is running successfully.
-            </Typography>
-            <Box sx={{ mt: 4, p: 2, bgcolor: 'primary.light', borderRadius: 2 }}>
-              <Typography variant="h6" color="white">
-                ✅ Backend API: Running on port 8080
-              </Typography>
-              <Typography variant="h6" color="white">
-                ✅ Frontend UI: Running on port 3000
-              </Typography>
-              <Typography variant="h6" color="white">
-                ✅ Database: H2 embedded database
-              </Typography>
+      <Router>
+        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+          <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+            <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+            <Box component="main" sx={{ flexGrow: 1, p: 3, bgcolor: 'background.default' }}>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/upload" element={<UploadSyllabus />} />
+                <Route path="/calendar" element={<CalendarSync />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
             </Box>
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="body2" color="text.secondary">
-                Backend API: <a href="http://localhost:8080/api/health" target="_blank" rel="noopener noreferrer">http://localhost:8080/api/health</a>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                H2 Console: <a href="http://localhost:8080/h2-console" target="_blank" rel="noopener noreferrer">http://localhost:8080/h2-console</a>
-              </Typography>
-            </Box>
-          </Paper>
-        </Container>
-      </Box>
+          </Box>
+        </Box>
+      </Router>
     </ThemeProvider>
   );
 };
