@@ -25,7 +25,7 @@ import java.util.*;
 @Service
 public class ChatBotService {
 
-    @Value("${gemini.api-key}")
+    @Value("${GEMINI_API_KEY}")
     private String geminiApiKey;
 
     @Autowired
@@ -96,7 +96,7 @@ public class ChatBotService {
             """, prompt.replace("\"", "\\\""));
 
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=" + geminiApiKey))
+                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + geminiApiKey))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
