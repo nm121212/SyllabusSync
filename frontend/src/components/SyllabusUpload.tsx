@@ -217,7 +217,11 @@ const SyllabusUpload: React.FC = () => {
                           />
                         </Box>
                       }
-                      secondary={`Due: ${task.dueDate} | ${task.description}`}
+                      secondary={`Due: ${new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                      }).replace(/\//g, '-')} | ${task.description}`}
                     />
                   </ListItem>
                   {index < parseResult.tasks.length - 1 && <Divider />}

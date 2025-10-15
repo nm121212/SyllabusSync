@@ -24,23 +24,117 @@ import {
   Notifications,
 } from '@mui/icons-material';
 
+// Type declaration for process.env
+declare const process: {
+  env: {
+    REACT_APP_API_BASE_URL?: string;
+  };
+};
+
 const CalendarSync: React.FC = () => {
   const [connected, setConnected] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [reminders, setReminders] = useState({
     sevenDays: true,
     threeDays: true,
     oneDay: true,
   });
 
-  const handleConnect = () => {
-    // Mock Google OAuth flow
-    setConnected(true);
+  // Check calendar connection status on component mount
+  React.useEffect(() => {
+    checkCalendarStatus();
+  }, []);
+
+  const checkCalendarStatus = async () => {
+    try {
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${apiBaseUrl}/syllabus/calendar/status`);
+      const data = await response.json();
+      setConnected(data.connected);
+    } catch (err) {
+      console.error('Failed to check calendar status:', err);
+    }
   };
 
-  const handleSync = () => {
-    // Mock sync operation
-    console.log('Syncing tasks to calendar...');
+  const handleConnect = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${apiBaseUrl}/syllabus/auth/google/url`);
+      const data = await response.json();
+      
+      if (data.authUrl) {
+        // Redirect to Google OAuth
+        window.location.href = data.authUrl;
+      } else {
+        setError('Failed to get Google OAuth URL');
+      }
+    } catch (err) {
+      setError('Failed to connect to Google Calendar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!connected) {
+      setError('Please connect your Google Calendar first');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Get all tasks
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
+      const tasksResponse = await fetch(`${apiBaseUrl}/syllabus/tasks`);
+      const tasks = await tasksResponse.json();
+      
+      if (tasks.length === 0) {
+        setError('No tasks found to sync');
+        return;
+      }
+      
+      // Group tasks by course
+      const tasksByCourse = tasks.reduce((acc: any, task: any) => {
+        const courseName = task.courseName || 'Unknown Course';
+        if (!acc[courseName]) {
+          acc[courseName] = [];
+        }
+        acc[courseName].push(task);
+        return acc;
+      }, {});
+      
+      // Sync each course's tasks
+      for (const [courseName, courseTasks] of Object.entries(tasksByCourse)) {
+        const syncResponse = await fetch(`${apiBaseUrl}/syllabus/generate-calendar`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tasks: courseTasks,
+            courseName: courseName,
+          }),
+        });
+        
+        if (!syncResponse.ok) {
+          const errorData = await syncResponse.json();
+          throw new (Error as any)((errorData as any).error || 'Failed to sync tasks');
+        }
+      }
+      
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? (err as Error).message : 'Failed to sync tasks');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -48,6 +142,12 @@ const CalendarSync: React.FC = () => {
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
         Calendar Sync
       </Typography>
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Connection Status */}
       <Card sx={{ mb: 3 }}>
@@ -86,8 +186,9 @@ const CalendarSync: React.FC = () => {
             onClick={handleConnect}
             startIcon={<CalendarMonth />}
             color={connected ? 'error' : 'primary'}
+            disabled={loading}
           >
-            {connected ? 'Disconnect Calendar' : 'Connect Google Calendar'}
+            {loading ? 'Connecting...' : connected ? 'Disconnect Calendar' : 'Connect Google Calendar'}
           </Button>
         </CardContent>
       </Card>
@@ -166,8 +267,9 @@ const CalendarSync: React.FC = () => {
               variant="contained"
               onClick={handleSync}
               startIcon={<Sync />}
+              disabled={loading}
             >
-              Sync Now
+              {loading ? 'Syncing...' : 'Sync Now'}
             </Button>
           </CardContent>
         </Card>

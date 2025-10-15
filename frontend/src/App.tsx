@@ -4,11 +4,11 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
 import Sidebar from './components/Sidebar.tsx';
 import TopBar from './components/TopBar.tsx';
+import UploadStatusBar from './components/UploadStatusBar.tsx';
 import Dashboard from './pages/Dashboard.tsx';
 import UploadSyllabus from './pages/UploadSyllabus.tsx';
 import CalendarSync from './pages/CalendarSync.tsx';
-import Settings from './pages/Settings.tsx';
-import Login from './pages/Login.tsx';
+import { UploadProvider } from './contexts/UploadContext.tsx';
 
 const theme = createTheme({
   palette: {
@@ -52,38 +52,30 @@ const theme = createTheme({
 });
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(true); // Mock auth
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  if (!isAuthenticated) {
-    return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Login onLogin={() => setIsAuthenticated(true)} />
-      </ThemeProvider>
-    );
-  }
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-          <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-            <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-            <Box component="main" sx={{ flexGrow: 1, p: 3, bgcolor: 'background.default' }}>
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/upload" element={<UploadSyllabus />} />
-                <Route path="/calendar" element={<CalendarSync />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
+      <UploadProvider>
+        <Router>
+          <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+            <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+              <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+              <Box component="main" sx={{ flexGrow: 1, p: 3, bgcolor: 'background.default' }}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/upload" element={<UploadSyllabus />} />
+                  <Route path="/calendar" element={<CalendarSync />} />
+                </Routes>
+              </Box>
             </Box>
+            <UploadStatusBar />
           </Box>
-        </Box>
-      </Router>
+        </Router>
+      </UploadProvider>
     </ThemeProvider>
   );
 };

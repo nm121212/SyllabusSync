@@ -23,6 +23,7 @@
         <stanford-corenlp.version>4.5.0</stanford-corenlp.version>
         <google-calendar-api.version>v3-rev20231123-2.0.0</google-calendar-api.version>
         <google-auth.version>1.19.0</google-auth.version>
+        <google-ai.version>0.7.1</google-ai.version>
         <jjwt.version>0.11.5</jjwt.version>
         <springdoc.version>2.2.0</springdoc.version>
         <testcontainers.version>1.19.3</testcontainers.version>
@@ -110,25 +111,34 @@
             <artifactId>google-auth-library-oauth2-http</artifactId>
             <version>${google-auth.version}</version>
         </dependency>
-
-        <!-- JWT -->
+        <dependency>
+            <groupId>com.google.apis</groupId>
+            <artifactId>google-api-services-oauth2</artifactId>
+            <version>v2-rev20200213-1.32.1</version>
+        </dependency>
+        
+        <!-- Google AI (Gemini) - Using REST API directly -->
+        
+        <!-- JWT Authentication -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
-            <version>${jjwt.version}</version>
+            <version>0.11.5</version>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-impl</artifactId>
-            <version>${jjwt.version}</version>
+            <version>0.11.5</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
-            <version>${jjwt.version}</version>
+            <version>0.11.5</version>
             <scope>runtime</scope>
         </dependency>
+        
+
 
         <!-- H2 Database for development -->
         <dependency>

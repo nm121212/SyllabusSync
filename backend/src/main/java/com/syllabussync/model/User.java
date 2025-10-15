@@ -38,6 +38,9 @@ public class User {
     @Column(unique = true)
     private String email;
     
+    @Size(max = 255)
+    private String password;
+    
     @Size(max = 500)
     private String avatar;
     
@@ -104,6 +107,14 @@ public class User {
     
     public void setEmail(String email) {
         this.email = email;
+    }
+    
+    public String getPassword() {
+        return password;
+    }
+    
+    public void setPassword(String password) {
+        this.password = password;
     }
     
     public String getAvatar() {
@@ -193,5 +204,14 @@ public class User {
     public void removeTask(Task task) {
         tasks.remove(task);
         task.setUser(null);
+    }
+    
+    // Helper methods for authentication
+    public boolean isGoogleUser() {
+        return googleId != null && !googleId.trim().isEmpty();
+    }
+    
+    public boolean hasPassword() {
+        return password != null && !password.trim().isEmpty();
     }
 }

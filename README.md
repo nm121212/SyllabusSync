@@ -90,58 +90,116 @@ SyllabusSync eliminates the tedious manual work of transferring assignment dates
 
 ### Prerequisites
 
-- **Java 17+**
-- **Node.js 18+**
-- **Google Cloud Console** account (for Calendar API - FREE)
-- **Gmail account** (for email notifications - FREE)
+- **Java 17+** - [Download OpenJDK](https://openjdk.java.net/)
+- **Node.js 18+** - [Download Node.js](https://nodejs.org/)
+- **Maven 3.6+** - [Download Maven](https://maven.apache.org/download.cgi) (or use included Maven wrapper)
 
-### Installation
+### 1. Clone the Repository
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/SyllabusSync.git
-   cd SyllabusSync
-   ```
+```bash
+git clone https://github.com/yourusername/syllabussync.git
+cd syllabussync
+```
 
-2. **Backend Setup**
-   ```bash
-   cd backend
-   ./mvnw clean install
-   ```
+### 2. Set Up Environment Variables
 
-3. **Frontend Setup**
-   ```bash
-   cd frontend
-   npm install
-   ```
+```bash
+# Copy the example environment file
+cp env.example .env
 
-4. **Database Setup**
-   ```bash
-   # No database setup needed! 
-   # SyllabusSync uses H2 embedded database for development (FREE)
-   # H2 console available at: http://localhost:8080/h2-console
-   ```
+# Edit .env with your actual credentials
+nano .env  # or use your preferred editor
+```
 
-5. **Environment Configuration**
-   ```bash
-   # Copy and configure environment files
-   cp backend/src/main/resources/application-example.yml backend/src/main/resources/application.yml
-   cp frontend/.env.example frontend/.env
-   ```
+**Required environment variables:**
+```env
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
 
-6. **Start the application**
-   ```bash
-   # Terminal 1: Backend
-   cd backend && ./mvnw spring-boot:run
-   
-   # Terminal 2: Frontend  
-   cd frontend && npm start
-   ```
+# Gemini AI API Configuration  
+GEMINI_API_KEY=your_gemini_api_key_here
 
-7. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8080
-   - API Docs: http://localhost:8080/swagger-ui.html
+# JWT Configuration
+JWT_SECRET=your_jwt_secret_key_here_make_it_long_and_random
+
+# Frontend Configuration
+REACT_APP_GOOGLE_CLIENT_ID=your_google_client_id_here
+```
+
+### 3. Set Up Google OAuth
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable Google Calendar API
+4. Create OAuth 2.0 credentials
+5. Add `http://localhost:8080/auth/google/callback` as authorized redirect URI
+6. Copy the client ID and secret to your `.env` file
+
+### 4. Set Up Gemini AI API
+
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create a new API key
+3. Copy the key to your `.env` file
+
+### 5. Start the Application
+
+#### 🎯 **One-Command Startup (Recommended)**
+
+```bash
+# Start everything with one command
+./start.sh
+```
+
+This will:
+- ✅ Check prerequisites (Java, Node.js)
+- ✅ Start the Spring Boot backend
+- ✅ Start the React frontend
+- ✅ Wait for services to be ready
+- ✅ Show you the URLs to access the application
+
+#### Alternative: Manual Setup
+
+**Start Backend:**
+```bash
+cd backend
+./mvnw spring-boot:run
+```
+
+**Start Frontend (in another terminal):**
+```bash
+cd frontend
+npm install
+npm start
+```
+
+#### Docker Setup
+
+```bash
+# Start all services with Docker
+docker-compose up --build
+
+# Or run in background
+docker-compose up -d --build
+```
+
+### 6. Access the Application
+
+Once started, you can access:
+
+- **🌐 Frontend:** http://localhost:3000
+- **📊 Backend API:** http://localhost:8080/api
+- **🗄️ H2 Database Console:** http://localhost:8080/h2-console
+- **📚 Health Check:** http://localhost:8080/actuator/health
+
+### 7. Stop the Application
+
+```bash
+# Stop all services
+./stop.sh
+```
+
+Or press `Ctrl+C` in the terminal where you ran `./start.sh`
 
 ## 🔧 Configuration
 
@@ -251,28 +309,48 @@ REACT_APP_GOOGLE_CLIENT_ID=your_google_client_id
 
 ```
 SyllabusSync/
-├── backend/
-│   ├── src/main/java/com/syllabussync/
-│   │   ├── controller/          # REST controllers
-│   │   ├── service/            # Business logic
-│   │   ├── repository/         # Data access layer
-│   │   ├── model/              # JPA entities
-│   │   ├── dto/                # Data transfer objects
-│   │   ├── config/             # Configuration classes
-│   │   └── util/               # Utility classes
-│   └── src/main/resources/
-│       ├── application.yml     # Configuration
-│       └── db/migration/       # Flyway migrations
-├── frontend/
-│   ├── src/
-│   │   ├── components/         # React components
-│   │   ├── pages/              # Page components
-│   │   ├── services/           # API services
-│   │   ├── hooks/              # Custom hooks
-│   │   └── utils/              # Utility functions
-│   └── public/
-└── docs/                       # Documentation
+├── backend/                 # Spring Boot API
+│   ├── src/main/java/      # Java source code
+│   ├── src/main/resources/ # Configuration files
+│   └── pom.xml            # Maven dependencies
+├── frontend/               # React.js SPA
+│   ├── src/               # React source code
+│   ├── public/            # Static assets
+│   └── package.json       # Node.js dependencies
+├── start.sh               # One-command startup script
+├── stop.sh                # Clean shutdown script
+├── docker-compose.yml     # Docker orchestration
+└── README.md             # This file
 ```
+
+### Running in Development
+
+#### Quick Start (Recommended)
+```bash
+# Start everything with one command
+./start.sh
+
+# Stop everything
+./stop.sh
+```
+
+#### Manual Development Setup
+1. **Start Backend**
+   ```bash
+   cd backend
+   ./mvnw spring-boot:run
+   ```
+
+2. **Start Frontend**
+   ```bash
+   cd frontend
+   npm start
+   ```
+
+3. **Access Application**
+   - Frontend: http://localhost:3000
+   - Backend: http://localhost:8080
+   - H2 Console: http://localhost:8080/h2-console
 
 ### Running Tests
 

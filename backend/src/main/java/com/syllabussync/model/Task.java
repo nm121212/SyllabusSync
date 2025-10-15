@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +44,7 @@ public class Task {
     
     @NotNull
     @Column(name = "due_date")
-    private LocalDateTime dueDate;
+    private LocalDate dueDate;
     
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
@@ -79,7 +80,7 @@ public class Task {
     // Constructors
     public Task() {}
     
-    public Task(String title, TaskType type, LocalDateTime dueDate, User user, Course course) {
+    public Task(String title, TaskType type, LocalDate dueDate, User user, Course course) {
         this.title = title;
         this.type = type;
         this.dueDate = dueDate;
@@ -141,13 +142,15 @@ public class Task {
         this.priority = priority;
     }
     
-    public LocalDateTime getDueDate() {
+    public LocalDate getDueDate() {
         return dueDate;
     }
     
-    public void setDueDate(LocalDateTime dueDate) {
+    public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
     }
+    
+
     
     public LocalDateTime getCompletedAt() {
         return completedAt;
@@ -223,17 +226,17 @@ public class Task {
     
     // Helper methods
     public boolean isOverdue() {
-        return status != TaskStatus.COMPLETED && dueDate.isBefore(LocalDateTime.now());
+        return status != TaskStatus.COMPLETED && dueDate.isBefore(LocalDate.now());
     }
     
     public boolean isDueSoon() {
         return status != TaskStatus.COMPLETED && 
-               dueDate.isBefore(LocalDateTime.now().plusDays(3)) && 
-               dueDate.isAfter(LocalDateTime.now());
+               dueDate.isBefore(LocalDate.now().plusDays(3)) && 
+               dueDate.isAfter(LocalDate.now());
     }
     
     public long getDaysUntilDue() {
-        return java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), dueDate);
+        return java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), dueDate);
     }
     
     public void addReminder(Reminder reminder) {

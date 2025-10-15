@@ -35,26 +35,33 @@ spring:
   
   flyway:
     enabled: false
+    
+  sql:
+    init:
+      mode: never
   
-  # OAuth2 configuration (commented out for initial testing)
-  # security:
-  #   oauth2:
-  #     client:
-  #       registration:
-  #         google:
-  #           client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
-  #           client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
-  #           scope:
-  #             - openid
-  #             - profile
-  #             - email
-  #             - https://www.googleapis.com/auth/calendar
-  #       provider:
-  #         google:
-  #           authorization-uri: https://accounts.google.com/o/oauth2/auth
-  #           token-uri: https://oauth2.googleapis.com/token
-  #           user-info-uri: https://www.googleapis.com/oauth2/v2/userinfo
-  #           jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+# Google OAuth2 configuration
+# Get these from Google Cloud Console:
+# 1. Go to https://console.cloud.google.com/
+# 2. Create a new project or select existing
+# 3. Enable Google Calendar API
+# 4. Create OAuth 2.0 credentials
+# 5. Add http://localhost:8080/auth/google/callback as authorized redirect URI
+google:
+  client-id: ${GOOGLE_CLIENT_ID}
+  client-secret: ${GOOGLE_CLIENT_SECRET}
+  redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/auth/google/callback}
+  
+  # Gemini AI API for intelligent parsing
+  gemini:
+    api-key: ${GEMINI_API_KEY}
+    model: gemini-2.5-flash
+    max-tokens: 4096
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:1800000} # 30 minutes in milliseconds
   
   mail:
     # Using free Gmail SMTP (requires app password)
@@ -122,7 +129,7 @@ logging:
 # Application specific configuration
 app:
   jwt:
-    secret: ${JWT_SECRET:mySecretKey}
+    secret: ${JWT_SECRET}
     expiration: 86400000 # 24 hours
   
   file:
@@ -204,7 +211,7 @@ spring:
   datasource:
     url: jdbc:postgresql://postgres:5432/syllabussync
     username: syllabussync
-    password: syllabussync_password
+    password: ${POSTGRES_PASSWORD:syllabussync_password}
   
   cache:
     redis:

@@ -1,19 +1,68 @@
 package com.syllabussync.controller;
 
+import com.syllabussync.service.IntelligentParsingService;
 import com.syllabussync.service.SyllabusParsingService;
+import com.syllabussync.service.GoogleCalendarService;
+import com.syllabussync.service.TaskService;
+import com.syllabussync.model.Task;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/syllabus")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "*", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class SyllabusController {
 
     @Autowired
+    private IntelligentParsingService intelligentParsingService;
+    
+    @Autowired
     private SyllabusParsingService syllabusParsingService;
+    
+    @Autowired
+    private GoogleCalendarService googleCalendarService;
+    
+    @Autowired
+    private TaskService taskService;
+    
+    // Google Calendar OAuth endpoints
+    @GetMapping("/auth/google/url")
+    public ResponseEntity<Map<String, Object>> getGoogleAuthUrl() {
+        try {
+            String authUrl = googleCalendarService.getAuthorizationUrl();
+            return ResponseEntity.ok(Map.of("authUrl", authUrl));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Failed to generate auth URL: " + e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/auth/google/callback")
+    public ResponseEntity<Map<String, Object>> handleGoogleCallback(
+            @RequestParam("code") String code) {
+        try {
+            String result = googleCalendarService.handleCallback(code, "default-user");
+            return ResponseEntity.ok(Map.of("message", result));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Failed to handle callback: " + e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/calendar/status")
+    public ResponseEntity<Map<String, Object>> getCalendarStatus() {
+        try {
+            boolean isConnected = googleCalendarService.isUserConnected("default-user");
+            return ResponseEntity.ok(Map.of("connected", isConnected));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Failed to check calendar status: " + e.getMessage()));
+        }
+    }
 
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> uploadSyllabus(
@@ -21,96 +70,319 @@ public class SyllabusController {
             @RequestParam(value = "courseName", required = false) String courseName) {
         
         try {
-            // Validate file
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Please select a file to upload"));
+                    .body(Map.of("error", "File is empty"));
             }
             
-            String fileName = file.getOriginalFilename();
-            if (fileName == null || !isValidFileType(fileName)) {
+            if (!isValidFileType(file.getOriginalFilename())) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Please upload a PDF, DOCX, or TXT file"));
+                    .body(Map.of("error", "Unsupported file type. Please upload a PDF, DOCX, or TXT file."));
             }
             
-            // Real PDF parsing
-            List<Map<String, Object>> tasks = syllabusParsingService.parseFile(file);
+            // Try intelligent parsing first, fallback to simple parsing if API key not available
+            Map<String, Object> parseResult;
+            String parsingMethod;
             
-            // If no tasks found, return helpful message
-            if (tasks.isEmpty()) {
-                tasks = Arrays.asList(createTask("No assignments found", "2024-12-31", "OTHER", "LOW"));
+            try {
+                parseResult = intelligentParsingService.parseFile(file);
+                parsingMethod = "intelligent";
+            } catch (Exception e) {
+                if (e.getMessage().contains("Gemini API key not configured")) {
+                    // Fallback to simple parsing
+                    List<Map<String, Object>> tasks = syllabusParsingService.parseFile(file);
+                    parseResult = new HashMap<>();
+                    parseResult.put("tasks", tasks);
+                    parseResult.put("courseName", courseName != null ? courseName : "Unknown Course");
+                    parsingMethod = "simple";
+                } else {
+                    throw e; // Re-throw other exceptions
+                }
             }
+            
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> tasks = (List<Map<String, Object>>) parseResult.get("tasks");
+            String extractedCourseName = (String) parseResult.get("courseName");
+            String finalCourseName = courseName != null ? courseName : extractedCourseName;
+            
+            // Store the tasks in TaskService (no automatic calendar sync)
+            List<Task> savedTasks = taskService.createTasksFromParsedData(tasks, finalCourseName);
             
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Syllabus parsed successfully");
-            response.put("fileName", fileName);
-            response.put("courseName", courseName != null ? courseName : "Sample Course");
+            response.put("fileName", file.getOriginalFilename());
+            response.put("courseName", finalCourseName);
             response.put("tasksFound", tasks.size());
+            response.put("tasksSaved", savedTasks.size());
             response.put("tasks", tasks);
+            response.put("message", tasks.isEmpty() ? "No tasks found in syllabus" : 
+                "Syllabus parsed successfully with " + (parsingMethod.equals("intelligent") ? "AI" : "simple parsing") + 
+                " and " + savedTasks.size() + " tasks saved to dashboard");
+            response.put("parsingMethod", parsingMethod);
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                .body(Map.of("error", "Failed to process syllabus: " + e.getMessage()));
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to parse syllabus: " + e.getMessage());
+            errorResponse.put("fileName", file.getOriginalFilename());
+            return ResponseEntity.internalServerError().body(errorResponse);
         }
     }
     
     @PostMapping("/generate-calendar")
-    public ResponseEntity<Map<String, Object>> generateCalendar(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Map<String, Object>> generateCalendar(
+            @RequestBody Map<String, Object> request) {
         try {
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> tasks = (List<Map<String, Object>>) request.get("tasks");
+            List<Map<String, Object>> taskMaps = (List<Map<String, Object>>) request.get("tasks");
             String courseName = (String) request.get("courseName");
             
-            // Mock calendar generation
-            String calendarUrl = generateMockCalendar(tasks, courseName);
+            // Check if Google Calendar is connected
+            if (!googleCalendarService.isUserConnected("default-user")) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Please connect your Google Calendar first"));
+            }
+            
+            // Add course name to each task
+            for (Map<String, Object> taskMap : taskMaps) {
+                taskMap.put("courseName", courseName);
+            }
+            
+            List<String> eventIds = new ArrayList<>();
+            for (Map<String, Object> taskMap : taskMaps) {
+                try {
+                    String eventId = googleCalendarService.createCalendarEvent("default-user", taskMap);
+                    eventIds.add(eventId);
+                } catch (IOException e) {
+                    System.err.println("Failed to create calendar event: " + e.getMessage());
+                }
+            }
             
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Calendar generated successfully");
-            response.put("calendarUrl", calendarUrl);
-            response.put("eventsCreated", tasks.size());
+            response.put("message", "Calendar events created successfully");
+            response.put("eventsCreated", eventIds.size());
+            response.put("eventIds", eventIds);
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
-                .body(Map.of("error", "Failed to generate calendar: " + e.getMessage()));
+                .body(Map.of("error", "Failed to create calendar events: " + e.getMessage()));
         }
     }
     
+    @GetMapping("/tasks")
+    public ResponseEntity<List<Map<String, Object>>> getAllTasks() {
+        try {
+            List<Task> tasks = taskService.getAllTasks();
+            return ResponseEntity.ok(convertTasksToMap(tasks));
+        } catch (Exception e) {
+            System.err.println("Error getting tasks: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    @PutMapping("/tasks/{taskId}")
+    public ResponseEntity<Map<String, Object>> updateTask(
+            @PathVariable Long taskId,
+            @RequestBody Map<String, Object> updates) {
+        try {
+            Task updatedTask = taskService.updateTask(taskId, updates);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Task updated successfully");
+            response.put("task", Map.of(
+                "id", updatedTask.getId(),
+                "title", updatedTask.getTitle(),
+                "description", updatedTask.getDescription(),
+                "status", updatedTask.getStatus().toString(),
+                "priority", updatedTask.getPriority().toString(),
+                "dueDate", updatedTask.getDueDate().toString()
+            ));
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Error updating task: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    @DeleteMapping("/tasks/{taskId}")
+    public ResponseEntity<Map<String, Object>> deleteTask(
+            @PathVariable Long taskId) {
+        try {
+            taskService.deleteTask(taskId);
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Task deleted successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Error deleting task: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    @DeleteMapping("/tasks")
+    public ResponseEntity<Map<String, Object>> deleteAllTasks() {
+        try {
+            taskService.deleteAllTasks();
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "All tasks deleted successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Error deleting all tasks: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    @PostMapping("/tasks/{taskId}/sync-calendar")
+    public ResponseEntity<Map<String, Object>> syncTaskToCalendar(@PathVariable Long taskId) {
+        try {
+            List<Task> allTasks = taskService.getAllTasks();
+            Task task = allTasks.stream()
+                    .filter(t -> t.getId().equals(taskId))
+                    .findFirst()
+                    .orElse(null);
+            
+            if (task == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            if (!googleCalendarService.isUserConnected("default-user")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Google Calendar not connected. Please connect your calendar first."));
+            }
+            
+            String courseName = task.getCourse() != null ? task.getCourse().getCourseName() : "Unknown Course";
+            String eventId = googleCalendarService.createCalendarEventForTask("default-user", task, courseName);
+            
+            // Update task with Google Event ID
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("googleEventId", eventId);
+            taskService.updateTask(taskId, updates);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Task synced to Google Calendar successfully",
+                "eventId", eventId,
+                "taskId", taskId
+            ));
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to sync task to calendar: " + e.getMessage()));
+        }
+    }
+    
+    @PostMapping("/tasks/sync-all-calendar")
+    public ResponseEntity<Map<String, Object>> syncAllTasksToCalendar() {
+        try {
+            if (!googleCalendarService.isUserConnected("default-user")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Google Calendar not connected. Please connect your calendar first."));
+            }
+            
+            List<Task> allTasks = taskService.getAllTasks();
+            int syncedCount = 0;
+            int failedCount = 0;
+            List<String> errors = new ArrayList<>();
+            
+            for (Task task : allTasks) {
+                try {
+                    // Skip if already synced
+                    if (task.getGoogleEventId() != null && !task.getGoogleEventId().isEmpty()) {
+                        continue;
+                    }
+                    
+                    String courseName = task.getCourse() != null ? task.getCourse().getCourseName() : "Unknown Course";
+                    String eventId = googleCalendarService.createCalendarEventForTask("default-user", task, courseName);
+                    
+                    // Update task with Google Event ID
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("googleEventId", eventId);
+                    taskService.updateTask(task.getId(), updates);
+                    
+                    syncedCount++;
+                } catch (Exception e) {
+                    failedCount++;
+                    errors.add("Task '" + task.getTitle() + "': " + e.getMessage());
+                }
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Calendar sync completed");
+            response.put("syncedCount", syncedCount);
+            response.put("failedCount", failedCount);
+            response.put("totalTasks", allTasks.size());
+            
+            if (!errors.isEmpty()) {
+                response.put("errors", errors);
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to sync tasks to calendar: " + e.getMessage()));
+        }
+    }
+    
+    @PostMapping("/tasks/batch")
+    public ResponseEntity<Map<String, Object>> saveTasks(
+            @RequestBody Map<String, Object> request) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> taskMaps = (List<Map<String, Object>>) request.get("tasks");
+            String courseName = (String) request.get("courseName");
+            
+            List<Task> savedTasks = taskService.createTasksFromParsedData(taskMaps, courseName);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Tasks saved successfully",
+                "tasksSaved", savedTasks.size()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                .body(Map.of("error", "Failed to save tasks: " + e.getMessage()));
+        }
+    }
+    
+    
     private boolean isValidFileType(String fileName) {
+        if (fileName == null) {
+            return false;
+        }
         String lowerCase = fileName.toLowerCase();
         return lowerCase.endsWith(".pdf") || 
                lowerCase.endsWith(".docx") || 
                lowerCase.endsWith(".txt");
     }
     
-    private List<Map<String, Object>> mockParseSyllabus(String courseName) {
-        List<Map<String, Object>> tasks = new ArrayList<>();
-        
-        // Mock extracted tasks
-        tasks.add(createTask("Assignment 1: Introduction Essay", "2024-02-15", "ASSIGNMENT", "HIGH"));
-        tasks.add(createTask("Midterm Exam", "2024-03-15", "EXAM", "URGENT"));
-        tasks.add(createTask("Project Proposal", "2024-04-01", "PROJECT", "MEDIUM"));
-        tasks.add(createTask("Final Paper", "2024-05-01", "PAPER", "HIGH"));
-        tasks.add(createTask("Final Exam", "2024-05-15", "EXAM", "URGENT"));
-        
-        return tasks;
-    }
-    
-    private Map<String, Object> createTask(String title, String dueDate, String type, String priority) {
-        Map<String, Object> task = new HashMap<>();
-        task.put("title", title);
-        task.put("dueDate", dueDate);
-        task.put("type", type);
-        task.put("priority", priority);
-        task.put("description", "Extracted from syllabus");
-        return task;
-    }
-    
-    private String generateMockCalendar(List<Map<String, Object>> tasks, String courseName) {
-        // Mock calendar generation - in real implementation, this would create Google Calendar events
-        return "https://calendar.google.com/calendar/embed?src=mock_calendar_id";
+    private List<Map<String, Object>> convertTasksToMap(List<Task> tasks) {
+        return tasks.stream().map(task -> {
+            Map<String, Object> taskMap = new HashMap<>();
+            taskMap.put("id", task.getId());
+            taskMap.put("title", task.getTitle());
+            taskMap.put("description", task.getDescription());
+            taskMap.put("dueDate", task.getDueDate().toString());
+            taskMap.put("type", task.getType().toString());
+            taskMap.put("priority", task.getPriority().toString());
+            taskMap.put("status", task.getStatus().toString());
+            // Safely get course name
+            String courseName = "Unknown Course";
+            try {
+                if (task.getCourse() != null) {
+                    courseName = task.getCourse().getName();
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting course name for task " + task.getId() + ": " + e.getMessage());
+            }
+            taskMap.put("courseName", courseName);
+            return taskMap;
+        }).toList();
     }
 }

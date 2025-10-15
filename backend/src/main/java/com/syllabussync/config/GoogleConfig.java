@@ -1,0 +1,72 @@
+package com.syllabussync.config;
+
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
+import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.util.store.FileDataStoreFactory;
+import com.google.api.services.calendar.Calendar;
+import com.google.api.services.calendar.CalendarScopes;
+import com.google.api.services.oauth2.Oauth2Scopes;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.io.File;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.util.Arrays;
+import java.util.List;
+
+@Configuration
+public class GoogleConfig {
+
+    @Value("${google.client-id}")
+    private String clientId;
+
+    @Value("${google.client-secret}")
+    private String clientSecret;
+
+    @Value("${google.redirect-uri:http://localhost:8080/auth/google/callback}")
+    private String redirectUri;
+
+    private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
+    private static final List<String> SCOPES = Arrays.asList(
+        CalendarScopes.CALENDAR,
+        Oauth2Scopes.USERINFO_EMAIL,
+        Oauth2Scopes.USERINFO_PROFILE
+    );
+
+    @Bean
+    public NetHttpTransport httpTransport() throws GeneralSecurityException, IOException {
+        return GoogleNetHttpTransport.newTrustedTransport();
+    }
+
+    @Bean
+    public JsonFactory jsonFactory() {
+        return JSON_FACTORY;
+    }
+
+    @Bean
+    public GoogleAuthorizationCodeFlow googleAuthFlow(NetHttpTransport httpTransport) throws IOException {
+        GoogleClientSecrets.Details details = new GoogleClientSecrets.Details();
+        details.setClientId(clientId);
+        details.setClientSecret(clientSecret);
+
+        GoogleClientSecrets clientSecrets = new GoogleClientSecrets();
+        clientSecrets.setWeb(details);
+
+        // Create a directory for storing credentials
+        File dataStoreDir = new File(System.getProperty("user.home"), ".credentials/syllabussync");
+        FileDataStoreFactory dataStoreFactory = new FileDataStoreFactory(dataStoreDir);
+
+        return new GoogleAuthorizationCodeFlow.Builder(
+                httpTransport, JSON_FACTORY, clientSecrets, SCOPES)
+                .setDataStoreFactory(dataStoreFactory)
+                .setAccessType("offline")
+                .setApprovalPrompt("force")
+                .build();
+    }
+}

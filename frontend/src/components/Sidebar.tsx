@@ -16,8 +16,6 @@ import {
   Dashboard as DashboardIcon,
   CloudUpload,
   CalendarMonth,
-  Settings,
-  Logout,
   MenuOpen,
 } from '@mui/icons-material';
 
@@ -30,7 +28,6 @@ const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Upload Syllabus', icon: <CloudUpload />, path: '/upload' },
   { text: 'Calendar', icon: <CalendarMonth />, path: '/calendar' },
-  { text: 'Settings', icon: <Settings />, path: '/settings' },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ open, onToggle }) => {
@@ -126,28 +123,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onToggle }) => {
         ))}
       </List>
 
-      <Box sx={{ flexGrow: 1 }} />
-
-      <Divider />
-
-      <List sx={{ px: 1, py: 1 }}>
-        <ListItem disablePadding>
-          <ListItemButton
-            sx={{
-              borderRadius: 2,
-              color: 'error.main',
-              '&:hover': {
-                bgcolor: 'error.light',
-              },
-            }}
-          >
-            <ListItemIcon sx={{ color: 'error.main', minWidth: 40 }}>
-              <Logout />
-            </ListItemIcon>
-            <ListItemText primary="Logout" />
-          </ListItemButton>
-        </ListItem>
-      </List>
     </Drawer>
   );
 };

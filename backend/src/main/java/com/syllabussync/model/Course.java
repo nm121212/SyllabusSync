@@ -2,6 +2,7 @@ package com.syllabussync.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -30,6 +31,10 @@ public class Course {
     @Size(max = 200)
     @Column(name = "course_name")
     private String courseName;
+    
+    @NotBlank
+    @Size(max = 200)
+    private String name;
     
     @Size(max = 1000)
     private String description;
@@ -67,6 +72,7 @@ public class Course {
     public Course(String courseCode, String courseName, User user) {
         this.courseCode = courseCode;
         this.courseName = courseName;
+        this.name = courseName;
         this.user = user;
     }
     
@@ -94,6 +100,16 @@ public class Course {
     public void setCourseName(String courseName) {
         this.courseName = courseName;
     }
+    
+    public String getName() {
+        return name;
+    }
+    
+    public void setName(String name) {
+        this.name = name;
+    }
+    
+
     
     public String getDescription() {
         return description;
