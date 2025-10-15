@@ -28,6 +28,7 @@ import {
   Edit,
   Delete,
   CalendarMonth,
+  Sync,
 } from '@mui/icons-material';
 
 interface Task {
@@ -57,6 +58,9 @@ const UploadSyllabus: React.FC = () => {
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncSuccess, setSyncSuccess] = useState(false);
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
@@ -140,6 +144,61 @@ const UploadSyllabus: React.FC = () => {
       setError('Failed to save tasks');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncToCalendar = async () => {
+    setSyncLoading(true);
+    setSyncError(null);
+    setSyncSuccess(false);
+    
+    try {
+      const API_BASE_URL = 'http://localhost:8080/api';
+      
+      // Get all tasks
+      const tasksResponse = await fetch(`${API_BASE_URL}/syllabus/tasks`);
+      const tasks = await tasksResponse.json();
+      
+      if (tasks.length === 0) {
+        setSyncError('No tasks found to sync');
+        return;
+      }
+      
+      // Group tasks by course
+      const tasksByCourse = tasks.reduce((acc: any, task: any) => {
+        const courseName = task.courseName || 'Unknown Course';
+        if (!acc[courseName]) {
+          acc[courseName] = [];
+        }
+        acc[courseName].push(task);
+        return acc;
+      }, {});
+      
+      // Sync each course's tasks
+      for (const [courseName, courseTasks] of Object.entries(tasksByCourse)) {
+        const syncResponse = await fetch(`${API_BASE_URL}/syllabus/generate-calendar`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tasks: courseTasks,
+            courseName: courseName,
+          }),
+        });
+        
+        if (!syncResponse.ok) {
+          const errorData = await syncResponse.json();
+          throw new (Error as any)((errorData as any).error || 'Failed to sync tasks');
+        }
+      }
+      
+      setSyncSuccess(true);
+      setSyncError(null);
+    } catch (err) {
+      setSyncError(err instanceof Error ? (err as Error).message : 'Failed to sync tasks');
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -333,6 +392,18 @@ const UploadSyllabus: React.FC = () => {
                 {parseResult?.tasksFound} tasks have been added to your dashboard.
               </Typography>
               
+              {syncError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {syncError}
+                </Alert>
+              )}
+              
+              {syncSuccess && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Tasks synced to Google Calendar successfully!
+                </Alert>
+              )}
+
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
                 <Button
                   variant="outlined"
@@ -341,16 +412,19 @@ const UploadSyllabus: React.FC = () => {
                     setFile(null);
                     setCourseName('');
                     setParseResult(null);
+                    setSyncError(null);
+                    setSyncSuccess(false);
                   }}
                 >
                   Upload Another Syllabus
                 </Button>
                 <Button
                   variant="contained"
-                  startIcon={<CalendarMonth />}
-                  href="/calendar"
+                  startIcon={syncLoading ? <CircularProgress size={20} /> : <Sync />}
+                  onClick={handleSyncToCalendar}
+                  disabled={syncLoading}
                 >
-                  Sync to Calendar
+                  {syncLoading ? 'Syncing...' : 'Sync to Calendar'}
                 </Button>
               </Box>
             </Box>
