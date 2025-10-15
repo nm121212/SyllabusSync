@@ -6,9 +6,6 @@ import {
   CardContent,
   Button,
   Alert,
-  Switch,
-  FormControlLabel,
-  Divider,
   List,
   ListItem,
   ListItemText,
@@ -20,8 +17,6 @@ import {
   CheckCircle,
   Error,
   Sync,
-  Settings,
-  Notifications,
 } from '@mui/icons-material';
 
 // Type declaration for process.env
@@ -33,14 +28,8 @@ declare const process: {
 
 const CalendarSync: React.FC = () => {
   const [connected, setConnected] = useState(false);
-  const [autoSync, setAutoSync] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reminders, setReminders] = useState({
-    sevenDays: true,
-    threeDays: true,
-    oneDay: true,
-  });
   const [syncedTasks, setSyncedTasks] = useState<any[]>([]);
 
   // Check calendar connection status on component mount
@@ -229,65 +218,6 @@ const CalendarSync: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Sync Settings */}
-      {connected && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Settings />
-              Sync Preferences
-            </Typography>
-
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={autoSync}
-                  onChange={(e) => setAutoSync(e.target.checked)}
-                />
-              }
-              label="Automatically sync new tasks"
-              sx={{ mb: 2 }}
-            />
-
-            <Divider sx={{ my: 2 }} />
-
-            <Typography variant="subtitle1" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Notifications />
-              Default Reminders
-            </Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={reminders.sevenDays}
-                    onChange={(e) => setReminders({ ...reminders, sevenDays: e.target.checked })}
-                  />
-                }
-                label="7 days before due date"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={reminders.threeDays}
-                    onChange={(e) => setReminders({ ...reminders, threeDays: e.target.checked })}
-                  />
-                }
-                label="3 days before due date"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={reminders.oneDay}
-                    onChange={(e) => setReminders({ ...reminders, oneDay: e.target.checked })}
-                  />
-                }
-                label="1 day before due date"
-              />
-            </Box>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Sync Now */}
       {connected && (
