@@ -77,9 +77,8 @@ public class ChatBotService {
                 } else {
                     // If task creation failed, provide helpful feedback
                     parsedResponse.put("response", 
-                        "I understood you want to create a task, but I need a bit more information. " +
-                        "Could you please specify the task title, due date, and what type of assignment it is? " +
-                        "For example: 'Add a history paper due next Friday' or 'Create a math homework due tomorrow'.");
+                        "I'd love to help you with that! Could you give me a bit more detail? " +
+                        "What's the assignment about and when is it due? I can help you plan it out and add it to your calendar.");
                     parsedResponse.remove("taskCreated");
                 }
             }
@@ -89,9 +88,8 @@ public class ChatBotService {
             System.err.println("ChatBot error: " + e.getMessage());
             e.printStackTrace();
             return Map.of(
-                "response", "I'm sorry, I'm having trouble processing your request right now. " +
-                          "Could you try rephrasing your message? For example, you could say: " +
-                          "'Add a task: [task name] due [date]' or 'I need to [task description] by [date]'."
+                "response", "Oops, I'm having a little trouble understanding that right now. " +
+                          "Could you try saying it a different way? I'm here to help with your assignments and planning!"
             );
         }
     }
@@ -148,6 +146,9 @@ public class ChatBotService {
             User: "I have a huge research paper due in 2 weeks"
             You: "That sounds like a big project! Let me help you break it down. What's the paper about? I can create a task for the final deadline and suggest some intermediate milestones to keep you on track. Research papers usually work well with a schedule like: research (3-4 days), outline (1 day), first draft (4-5 days), revision (2-3 days). What do you think?"
             
+            User: "I need help I have two tests next week and dont know how to prepare"
+            You: "Oh wow, two tests in one week - that's definitely a lot to handle! Let's break this down and make a plan. What subjects are the tests in? And do you know what topics they'll cover? I can help you create a study schedule that gives you enough time for both without burning out. Usually for tests, I recommend starting with the harder subject first and doing shorter, focused study sessions rather than cramming."
+            
             User: "Add a math homework due next Friday"
             You: "Sure thing! I'll add that math homework to your calendar for next Friday. What's the assignment about? And hey, since it's due next Friday, you might want to start working on it by Wednesday to give yourself some buffer time. Math homework can sometimes take longer than expected!"
             
@@ -156,6 +157,9 @@ public class ChatBotService {
             
             User: "Hi, how are you?"
             You: "Hi there! I'm doing great, thanks for asking! I'm here and ready to help you organize your academic life. How are you doing? Any assignments or projects you're working on that I can help you plan for?"
+            
+            User: "what"
+            You: "Hey! I'm here to help with your school stuff. Are you looking to add a task to your calendar, or do you need help planning something out? Just let me know what's on your mind!"
             
             RESPONSE FORMAT:
             Your response must be in this exact JSON format:
@@ -176,6 +180,9 @@ public class ChatBotService {
             - Offer planning suggestions and study tips when appropriate
             - Make the response feel natural and supportive
             - Don't be overly formal - be like a helpful friend
+            - For study planning questions, focus on giving helpful advice and asking follow-up questions
+            - Don't default to formal task creation messages - be flexible and conversational
+            - If someone asks for help with planning or studying, engage in conversation first
             
             Current user message: %s
             """, userMessage);
