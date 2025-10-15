@@ -39,8 +39,11 @@ public class ChatBotService {
 
     public Map<String, Object> processMessage(String message) {
         try {
-            // Send message to Gemini AI
-            String geminiResponse = callGeminiAPI(message);
+            // Get current tasks to provide context to the AI
+            List<Task> currentTasks = taskService.getAllTasks();
+            
+            // Send message to Gemini AI with task context
+            String geminiResponse = callGeminiAPI(message, currentTasks);
             
             // Parse the response
             Map<String, Object> parsedResponse = parseGeminiResponse(geminiResponse);
@@ -94,7 +97,23 @@ public class ChatBotService {
         }
     }
 
-    private String buildPrompt(String userMessage) {
+    private String buildPrompt(String userMessage, List<Task> currentTasks) {
+        // Format current tasks for context
+        String tasksContext = "";
+        if (currentTasks != null && !currentTasks.isEmpty()) {
+            tasksContext = "\n\nCURRENT TASKS IN YOUR DASHBOARD:\n";
+            for (Task task : currentTasks) {
+                tasksContext += String.format("- %s (%s) - Due: %s - %s priority\n", 
+                    task.getTitle(), 
+                    task.getType().toString(), 
+                    task.getDueDate().toString(),
+                    task.getPriority().toString());
+            }
+            tasksContext += "\nYou can reference these tasks when giving advice about workload, scheduling, and prioritization.\n";
+        } else {
+            tasksContext = "\n\nCURRENT TASKS: No tasks currently in your dashboard.\n";
+        }
+        
         return String.format("""
             You are a friendly, helpful AI assistant for a student task management system. You help students organize their academic life through natural conversation and can add tasks to their calendar automatically.
             
@@ -147,7 +166,10 @@ public class ChatBotService {
             You: "That sounds like a big project! Let me help you break it down. What's the paper about? I can create a task for the final deadline and suggest some intermediate milestones to keep you on track. Research papers usually work well with a schedule like: research (3-4 days), outline (1 day), first draft (4-5 days), revision (2-3 days). What do you think?"
             
             User: "I need help I have two tests next week and dont know how to prepare"
-            You: "Oh wow, two tests in one week - that's definitely a lot to handle! Let's break this down and make a plan. What subjects are the tests in? And do you know what topics they'll cover? I can help you create a study schedule that gives you enough time for both without burning out. Usually for tests, I recommend starting with the harder subject first and doing shorter, focused study sessions rather than cramming."
+            You: "Oh wow, two tests in one week - that's definitely a lot to handle! I can see you already have some assignments coming up too. Let's break this down and make a plan. What subjects are the tests in? And do you know what topics they'll cover? I can help you create a study schedule that works around your existing assignments. Usually for tests, I recommend starting with the harder subject first and doing shorter, focused study sessions rather than cramming."
+            
+            User: "How should I prioritize my work this week?"
+            You: "Looking at your current tasks, I can see you have [reference specific tasks]. Let me help you prioritize! I'd suggest tackling the [URGENT/HIGH priority] tasks first, especially [specific task name] since it's due [date]. Then you can work on [other tasks]. Does this sound like a good plan, or do you want to adjust anything?"
             
             User: "Add a math homework due next Friday"
             You: "Sure thing! I'll add that math homework to your calendar for next Friday. What's the assignment about? And hey, since it's due next Friday, you might want to start working on it by Wednesday to give yourself some buffer time. Math homework can sometimes take longer than expected!"
@@ -183,13 +205,17 @@ public class ChatBotService {
             - For study planning questions, focus on giving helpful advice and asking follow-up questions
             - Don't default to formal task creation messages - be flexible and conversational
             - If someone asks for help with planning or studying, engage in conversation first
+            - Use the current tasks information to give personalized advice about workload and scheduling
+            - Reference specific tasks when relevant to help with prioritization and planning
+            
+            %s
             
             Current user message: %s
-            """, userMessage);
+            """, tasksContext, userMessage);
     }
 
-    private String callGeminiAPI(String message) throws IOException, InterruptedException {
-        String prompt = buildPrompt(message);
+    private String callGeminiAPI(String message, List<Task> currentTasks) throws IOException, InterruptedException {
+        String prompt = buildPrompt(message, currentTasks);
         
         String requestBody = String.format("""
             {
