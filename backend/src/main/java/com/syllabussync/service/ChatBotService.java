@@ -76,40 +76,6 @@ public class ChatBotService {
         }
     }
 
-    private String callGeminiAPI(String message) throws IOException, InterruptedException {
-        String prompt = buildPrompt(message);
-        
-        String requestBody = String.format("""
-            {
-                "contents": [{
-                    "parts": [{
-                        "text": "%s"
-                    }]
-                }],
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "topK": 40,
-                    "topP": 0.95,
-                    "maxOutputTokens": 1024
-                }
-            }
-            """, prompt.replace("\"", "\\\""));
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + geminiApiKey))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("Gemini API error: " + response.body());
-        }
-        
-        return response.body();
-    }
-
     private String buildPrompt(String userMessage) {
         return String.format("""
             You are a friendly, helpful AI assistant for a student task management system called SyllabusSync. You help students organize their academic life by adding tasks to their calendar through natural conversation.
@@ -185,6 +151,40 @@ public class ChatBotService {
             """, userMessage);
     }
 
+    private String callGeminiAPI(String message) throws IOException, InterruptedException {
+        String prompt = buildPrompt(message);
+        
+        String requestBody = String.format("""
+            {
+                "contents": [{
+                    "parts": [{
+                        "text": "%s"
+                    }]
+                }],
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "topK": 40,
+                    "topP": 0.95,
+                    "maxOutputTokens": 1024
+                }
+            }
+            """, prompt.replace("\"", "\\\""));
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + geminiApiKey))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Gemini API error: " + response.body());
+        }
+        
+        return response.body();
+    }
+
     private Map<String, Object> parseGeminiResponse(String geminiResponse) {
         try {
             JsonNode rootNode = objectMapper.readTree(geminiResponse);
@@ -197,14 +197,22 @@ public class ChatBotService {
                     if (partsNode != null && partsNode.isArray() && partsNode.size() > 0) {
                         String text = partsNode.get(0).get("text").asText();
                         
+                        // Clean up the text - remove markdown code blocks if present
+                        String cleanText = text.trim();
+                        if (cleanText.startsWith("```json") && cleanText.endsWith("```")) {
+                            cleanText = cleanText.substring(7, cleanText.length() - 3).trim();
+                        } else if (cleanText.startsWith("```") && cleanText.endsWith("```")) {
+                            cleanText = cleanText.substring(3, cleanText.length() - 3).trim();
+                        }
+                        
                         // Try to parse as JSON first
                         try {
                             @SuppressWarnings("unchecked")
-                            Map<String, Object> result = objectMapper.readValue(text, Map.class);
+                            Map<String, Object> result = objectMapper.readValue(cleanText, Map.class);
                             return result;
                         } catch (Exception e) {
                             // If not JSON, treat as plain text response
-                            return Map.of("response", text);
+                            return Map.of("response", cleanText);
                         }
                     }
                 }
