@@ -12,16 +12,27 @@ import { UploadProvider } from './contexts/UploadContext.tsx';
 
 const theme = createTheme({
   palette: {
+    mode: 'dark',
     primary: {
-      main: '#4F46E5', // Indigo 600
-      light: '#EEF2FF', // Indigo 50
+      main: '#FF6B35', // Orange 600
+      light: '#FF8A65', // Orange 300
+      dark: '#E65100', // Orange 800
     },
-    success: { main: '#22C55E' },
-    warning: { main: '#FACC15' },
-    error: { main: '#EF4444' },
+    secondary: {
+      main: '#FFB74D', // Orange 300
+      light: '#FFCC80', // Orange 200
+      dark: '#F57C00', // Orange 700
+    },
+    success: { main: '#4CAF50' },
+    warning: { main: '#FF9800' },
+    error: { main: '#F44336' },
     background: {
-      default: '#F8FAFC',
-      paper: '#FFFFFF',
+      default: '#121212', // Dark background
+      paper: '#1E1E1E', // Slightly lighter for cards
+    },
+    text: {
+      primary: '#FFFFFF',
+      secondary: '#B0B0B0',
     },
   },
   typography: {
@@ -44,7 +55,24 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 12,
-          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -1px rgb(0 0 0 / 0.2)',
+          border: '1px solid rgba(255, 107, 53, 0.1)',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#1E1E1E',
+          border: '1px solid rgba(255, 107, 53, 0.1)',
+        },
+      },
+    },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#1E1E1E',
+          border: '1px solid rgba(255, 107, 53, 0.1)',
         },
       },
     },

@@ -416,7 +416,7 @@ const Dashboard: React.FC = () => {
             title="Total Tasks"
             value={stats.total}
             icon={<Assignment sx={{ fontSize: 32 }} />}
-            color="#4F46E5"
+            color="#FF6B35"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -424,7 +424,7 @@ const Dashboard: React.FC = () => {
             title="Completed"
             value={stats.completed}
             icon={<CheckCircle sx={{ fontSize: 32 }} />}
-            color="#22C55E"
+            color="#4CAF50"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -432,7 +432,7 @@ const Dashboard: React.FC = () => {
             title="Due This Week"
             value={stats.dueThisWeek}
             icon={<Schedule sx={{ fontSize: 32 }} />}
-            color="#FACC15"
+            color="#FFB74D"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -440,7 +440,7 @@ const Dashboard: React.FC = () => {
             title="Synced to Calendar"
             value={stats.synced}
             icon={<CalendarMonth sx={{ fontSize: 32 }} />}
-            color="#8B5CF6"
+            color="#FF8A65"
           />
         </Grid>
       </Grid>

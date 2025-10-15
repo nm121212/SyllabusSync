@@ -47,7 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onToggle }) => {
         '& .MuiDrawer-paper': {
           width: drawerWidth,
           boxSizing: 'border-box',
-          borderRight: '1px solid #E5E7EB',
+          borderRight: '1px solid rgba(255, 107, 53, 0.2)',
           bgcolor: 'background.paper',
         },
       }}
@@ -89,22 +89,22 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onToggle }) => {
               sx={{
                 borderRadius: 2,
                 '&.Mui-selected': {
-                  bgcolor: 'primary.light',
-                  color: 'primary.main',
+                  bgcolor: '#000000',
+                  color: '#FF6B35',
                   borderLeft: '3px solid',
-                  borderLeftColor: 'primary.main',
+                  borderLeftColor: '#FF6B35',
                   '&:hover': {
-                    bgcolor: 'primary.light',
+                    bgcolor: '#000000',
                   },
                 },
                 '&:hover': {
-                  bgcolor: 'grey.50',
+                  bgcolor: 'rgba(255, 107, 53, 0.1)',
                 },
               }}
             >
               <ListItemIcon
                 sx={{
-                  color: location.pathname === item.path ? 'primary.main' : 'grey.600',
+                  color: location.pathname === item.path ? '#FF6B35' : 'grey.600',
                   minWidth: 40,
                 }}
               >

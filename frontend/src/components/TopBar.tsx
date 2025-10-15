@@ -31,7 +31,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         elevation={0}
         sx={{
           bgcolor: 'background.paper',
-          borderBottom: '1px solid #E5E7EB',
+          borderBottom: '1px solid rgba(255, 107, 53, 0.2)',
           color: 'text.primary',
         }}
       >
