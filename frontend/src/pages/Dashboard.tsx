@@ -529,23 +529,11 @@ const Dashboard: React.FC = () => {
                       <TableCell>
                         <Box>
                           <Typography variant="body2">
-                            {(() => {
-                              try {
-                                if (!task.dueDate) return 'No date';
-                                // Handle both string and array formats
-                                const dateStr = Array.isArray(task.dueDate) ? task.dueDate.join('-') : task.dueDate;
-                                // Parse the date and format as MM-DD-YYYY
-                                const date = new Date(dateStr + 'T00:00:00');
-                                if (isNaN(date.getTime())) return 'Invalid date';
-                                const month = String(date.getMonth() + 1).padStart(2, '0');
-                                const day = String(date.getDate()).padStart(2, '0');
-                                const year = date.getFullYear();
-                                return `${month}-${day}-${year}`;
-                              } catch (error) {
-                                console.error('Date formatting error:', error, 'task.dueDate:', task.dueDate);
-                                return 'Error';
-                              }
-                            })()}
+                            {task.dueDate ? new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: '2-digit', 
+                              day: '2-digit' 
+                            }).replace(/\//g, '-') : 'No date'}
                           </Typography>
                           <Typography
                             variant="caption"

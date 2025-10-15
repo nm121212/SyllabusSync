@@ -1,0 +1,46 @@
+CS 3600 – Fall 2025 Key Dates & Events
+
+Aug 19: Intro: Overview, Logistics, History, Agents
+Aug 21: State/Action Search
+Aug 26: Local Search
+Aug 27: Puzzle Solver due
+Aug 28: Cost-aware Search 1
+Sept 2: Cost-aware Search 2
+Sept 3: Route Finder due
+Sept 4: Constraint Satisfaction Problems
+Sept 9: Adversarial Search
+Sept 10: Camp Designer due
+Sept 11: Exam on Searching for Solutions
+Sept 16: Probability on discrete variables
+Sept 18: Probability on continuous random variables
+Sept 22: Dice Guesser due
+Sept 23: Bayes Nets
+Sept 25: Bayes and Naive Bayes Classifiers
+Sept 29: Bayes Classifier and Bayes Net due
+Sept 30: Markov Chains and Hidden Markov Models
+Oct 2: Particle Filters and Kalman Filters
+Oct 7: No lecture (Fall Break)
+Oct 8: Dirty Croupier due
+Oct 9: Exam on Dealing With Uncertainty
+Oct 14: Intro to ML, Nearest Neighbors
+Oct 15: Nearest Neighbor Classifier due
+Oct 16: Linear Regression, MSE, Gradient Descent
+Oct 21: Logistic Regression
+Oct 22: Linear Regression assignment due
+Oct 23: Regression and classification with Neural Nets
+Oct 28: Convolutional Neural Nets, Max Pooling, PyTorch
+Oct 29: Neural Net from Scratch due
+Oct 30: Deep Learning (Dropout, Batch Norm, ResNets, Transfer Learning)
+Nov 4: Recurrent Neural Nets and Transformers
+Nov 5: Butterfly Classifier due
+Nov 6: Generative AI
+Nov 11: Exam on Learning from Data
+Nov 12: Quote Finder due
+Nov 13: Markov Decision Processes
+Nov 18: Reinforcement Learning
+Nov 19: MDP due
+Nov 20: Reinforcement Learning (continued)
+Nov 25: Monte Carlo Tree Search and AlphaZero
+Nov 27: No lecture (Thanksgiving Break)
+Dec 2: Deep Learning and Reasoning
+Dec 4: Final Exam (2:40 – 5:30)
