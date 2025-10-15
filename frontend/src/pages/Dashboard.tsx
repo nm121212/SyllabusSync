@@ -50,6 +50,8 @@ interface Task {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   description?: string;
   googleEventId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const API_BASE_URL = 'http://localhost:8080/api';
@@ -462,6 +464,63 @@ const Dashboard: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Recently Synced Tasks */}
+      <Card sx={{ mb: 4 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Recently Synced to Calendar
+          </Typography>
+          {tasks.filter(task => task.googleEventId).length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No tasks have been synced to Google Calendar yet.
+            </Typography>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {tasks
+                .filter(task => task.googleEventId)
+                .sort((a, b) => {
+                  // Sort by updatedAt (most recently synced first)
+                  const dateA = new Date(a.updatedAt || a.createdAt || new Date());
+                  const dateB = new Date(b.updatedAt || b.createdAt || new Date());
+                  return dateB.getTime() - dateA.getTime();
+                })
+                .slice(0, 5) // Show only the 5 most recently synced
+                .map((task) => (
+                  <Box key={task.id} sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 2, 
+                    p: 1, 
+                    borderRadius: 1,
+                    backgroundColor: 'action.hover',
+                    '&:hover': { backgroundColor: 'action.selected' }
+                  }}>
+                    <CheckCircle sx={{ color: 'success.main', fontSize: 20 }} />
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {task.title}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {task.courseName} • Due: {task.dueDate ? new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: '2-digit', 
+                          day: '2-digit' 
+                        }).replace(/\//g, '-') : 'No date'}
+                      </Typography>
+                    </Box>
+                    <Chip 
+                      label={task.type} 
+                      size="small" 
+                      variant="outlined" 
+                      color={task.priority === 'URGENT' ? 'error' : task.priority === 'HIGH' ? 'warning' : 'default'}
+                    />
+                  </Box>
+                ))}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Tasks Table */}
       <Card>
         <CardContent>
@@ -511,7 +570,14 @@ const Dashboard: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {tasks.map((task) => {
+                {tasks
+                  .sort((a, b) => {
+                    // Sort by due date: soonest first, latest last
+                    const dateA = new Date(a.dueDate + 'T00:00:00');
+                    const dateB = new Date(b.dueDate + 'T00:00:00');
+                    return dateA.getTime() - dateB.getTime();
+                  })
+                  .map((task) => {
                   const daysUntil = getDaysUntilDue(task.dueDate);
                   return (
                     <TableRow key={task.id} hover>

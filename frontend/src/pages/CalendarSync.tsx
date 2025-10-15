@@ -41,11 +41,45 @@ const CalendarSync: React.FC = () => {
     threeDays: true,
     oneDay: true,
   });
+  const [syncedTasks, setSyncedTasks] = useState<any[]>([]);
 
   // Check calendar connection status on component mount
   React.useEffect(() => {
     checkCalendarStatus();
+    fetchSyncedTasks();
   }, []);
+
+  const fetchSyncedTasks = async () => {
+    try {
+      const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${apiBaseUrl}/syllabus/tasks`);
+      const tasks = await response.json();
+      
+      // Filter tasks that have been synced (have googleEventId)
+      const synced = tasks.filter((task: any) => task.googleEventId);
+      setSyncedTasks(synced);
+    } catch (err) {
+      console.error('Failed to fetch synced tasks:', err);
+    }
+  };
+
+  const getTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return 'just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    } else {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days} day${days > 1 ? 's' : ''} ago`;
+    }
+  };
 
   const checkCalendarStatus = async () => {
     try {
@@ -130,6 +164,8 @@ const CalendarSync: React.FC = () => {
       }
       
       setError(null);
+      // Refresh synced tasks after successful sync
+      fetchSyncedTasks();
     } catch (err) {
       setError(err instanceof Error ? (err as Error).message : 'Failed to sync tasks');
     } finally {
@@ -282,38 +318,39 @@ const CalendarSync: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 2 }}>
               Recent Sync Activity
             </Typography>
-            <List>
-              <ListItem>
-                <ListItemIcon>
-                  <CheckCircle sx={{ color: 'success.main' }} />
-                </ListItemIcon>
-                <ListItemText
-                  primary="CS 3510 - Homework 1"
-                  secondary="Synced 2 hours ago"
-                />
-                <Chip label="Synced" color="success" size="small" />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon>
-                  <CheckCircle sx={{ color: 'success.main' }} />
-                </ListItemIcon>
-                <ListItemText
-                  primary="MUSI 3630 - Midterm Exam"
-                  secondary="Synced 1 day ago"
-                />
-                <Chip label="Synced" color="success" size="small" />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon>
-                  <CheckCircle sx={{ color: 'success.main' }} />
-                </ListItemIcon>
-                <ListItemText
-                  primary="HIST 2111 - Research Paper"
-                  secondary="Synced 3 days ago"
-                />
-                <Chip label="Synced" color="success" size="small" />
-              </ListItem>
-            </List>
+            {syncedTasks.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No tasks have been synced to Google Calendar yet.
+              </Typography>
+            ) : (
+              <List>
+                {syncedTasks
+                  .sort((a, b) => {
+                    // Sort by updatedAt (most recently synced first)
+                    const dateA = new Date(a.updatedAt || a.createdAt);
+                    const dateB = new Date(b.updatedAt || b.createdAt);
+                    return dateB.getTime() - dateA.getTime();
+                  })
+                  .slice(0, 5) // Show only the 5 most recently synced
+                  .map((task) => {
+                    const syncTime = new Date(task.updatedAt || task.createdAt);
+                    const timeAgo = getTimeAgo(syncTime);
+                    
+                    return (
+                      <ListItem key={task.id}>
+                        <ListItemIcon>
+                          <CheckCircle sx={{ color: 'success.main' }} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={`${task.courseName} - ${task.title}`}
+                          secondary={`Synced ${timeAgo}`}
+                        />
+                        <Chip label="Synced" color="success" size="small" />
+                      </ListItem>
+                    );
+                  })}
+              </List>
+            )}
           </CardContent>
         </Card>
       )}
