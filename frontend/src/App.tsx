@@ -8,6 +8,7 @@ import UploadStatusBar from './components/UploadStatusBar.tsx';
 import Dashboard from './pages/Dashboard.tsx';
 import UploadSyllabus from './pages/UploadSyllabus.tsx';
 import CalendarSync from './pages/CalendarSync.tsx';
+import ChatBot from './pages/ChatBot.tsx';
 import { UploadProvider } from './contexts/UploadContext.tsx';
 
 const theme = createTheme({
@@ -97,6 +98,7 @@ const App: React.FC = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/upload" element={<UploadSyllabus />} />
                   <Route path="/calendar" element={<CalendarSync />} />
+                  <Route path="/chatbot" element={<ChatBot />} />
                 </Routes>
               </Box>
             </Box>

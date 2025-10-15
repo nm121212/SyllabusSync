@@ -17,6 +17,7 @@ import {
   CloudUpload,
   CalendarMonth,
   MenuOpen,
+  SmartToy,
 } from '@mui/icons-material';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Upload Syllabus', icon: <CloudUpload />, path: '/upload' },
   { text: 'Calendar', icon: <CalendarMonth />, path: '/calendar' },
+  { text: 'AI Assistant', icon: <SmartToy />, path: '/chatbot' },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ open, onToggle }) => {

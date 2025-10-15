@@ -373,4 +373,29 @@ public class TaskService {
             System.err.println("Failed to load tasks from file: " + e.getMessage());
         }
     }
+
+    /**
+     * Save a single task to the system
+     */
+    public Task saveTask(Task task) {
+        if (task.getId() == null) {
+            task.setId(nextTaskId++);
+        }
+        
+        // Create a default course if none exists
+        if (task.getCourse() == null) {
+            Course defaultCourse = getOrCreateCourse("AI Assistant Tasks");
+            task.setCourse(defaultCourse);
+        }
+        
+        // Add to maps
+        allTasks.put(task.getId(), task);
+        String courseName = task.getCourse().getName();
+        tasksByCourse.computeIfAbsent(courseName, k -> new ArrayList<>()).add(task);
+        
+        // Save to file
+        saveTasksToFile();
+        
+        return task;
+    }
 }
