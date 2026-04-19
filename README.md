@@ -133,7 +133,7 @@ REACT_APP_GOOGLE_CLIENT_ID=your_google_client_id_here
 2. Create a new project or select existing
 3. Enable Google Calendar API
 4. Create OAuth 2.0 credentials
-5. Add `http://localhost:8080/auth/google/callback` as authorized redirect URI
+5. Add `http://localhost:8080/api/syllabus/auth/google/callback` as authorized redirect URI
 6. Copy the client ID and secret to your `.env` file
 
 ### 4. Set Up Gemini AI API
@@ -228,7 +228,7 @@ google:
   calendar:
     client-id: your_google_client_id
     client-secret: your_google_client_secret
-    redirect-uri: http://localhost:8080/auth/google/callback
+    redirect-uri: http://localhost:8080/api/syllabus/auth/google/callback
 
 syllabus:
   parsing:
@@ -250,8 +250,8 @@ REACT_APP_GOOGLE_CLIENT_ID=your_google_client_id
 3. Enable the Google Calendar API
 4. Create OAuth 2.0 credentials
 5. Add authorized redirect URIs:
-   - `http://localhost:8080/auth/google/callback` (development)
-   - `https://yourdomain.com/auth/google/callback` (production)
+   - `http://localhost:8080/api/syllabus/auth/google/callback` (development)
+   - `https://yourdomain.com/api/syllabus/auth/google/callback` (production — adjust if you change the API path)
 
 ## 📖 Usage
 

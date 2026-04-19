@@ -1,7 +1,9 @@
 package com.syllabussync.service;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.auth.oauth2.StoredCredential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
+import com.google.api.client.util.store.DataStore;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.services.calendar.Calendar;
@@ -9,6 +11,7 @@ import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.EventReminder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -17,6 +20,9 @@ import java.util.*;
 
 @Service
 public class GoogleCalendarService {
+
+    @Value("${google.redirect-uri}")
+    private String redirectUri;
 
     @Autowired
     private GoogleAuthorizationCodeFlow googleAuthFlow;
@@ -29,13 +35,13 @@ public class GoogleCalendarService {
 
     public String getAuthorizationUrl() {
         return googleAuthFlow.newAuthorizationUrl()
-                .setRedirectUri("http://localhost:8080/auth/google/callback")
+                .setRedirectUri(redirectUri)
                 .build();
     }
 
     public String handleCallback(String code, String userId) throws IOException {
         var tokenResponse = googleAuthFlow.newTokenRequest(code)
-                .setRedirectUri("http://localhost:8080/auth/google/callback")
+                .setRedirectUri(redirectUri)
                 .execute();
 
         googleAuthFlow.createAndStoreCredential(tokenResponse, userId);
@@ -80,8 +86,12 @@ public class GoogleCalendarService {
                 ));
         event.setReminders(reminders);
 
-        Event createdEvent = service.events().insert("primary", event).execute();
-        return createdEvent.getId();
+        try {
+            Event createdEvent = service.events().insert("primary", event).execute();
+            return createdEvent.getId();
+        } catch (IOException e) {
+            throw mapInvalidGrant(userId, e);
+        }
     }
 
     public boolean isUserConnected(String userId) {
@@ -98,6 +108,9 @@ public class GoogleCalendarService {
                     return true;
                 } catch (IOException e) {
                     System.err.println("Failed to refresh token: " + e.getMessage());
+                    if (isInvalidGrantError(e)) {
+                        clearStoredCredentialQuietly(userId);
+                    }
                     return false;
                 }
             }
@@ -110,12 +123,43 @@ public class GoogleCalendarService {
     }
 
     public void disconnectUser(String userId) throws IOException {
-        Credential credential = googleAuthFlow.loadCredential(userId);
-        if (credential != null) {
-            credential.getRefreshToken();
-            // Note: Google doesn't provide a direct revoke method in this version
-            // In production, you'd call the revoke endpoint manually
+        clearStoredCredential(userId);
+    }
+
+    /** Removes local OAuth tokens so the user must sign in with Google again. */
+    public void clearStoredCredential(String userId) throws IOException {
+        DataStore<StoredCredential> store = googleAuthFlow.getCredentialDataStore();
+        if (store != null) {
+            store.delete(userId);
         }
+    }
+
+    private void clearStoredCredentialQuietly(String userId) {
+        try {
+            clearStoredCredential(userId);
+        } catch (IOException ignored) {
+            // ignore
+        }
+    }
+
+    private static boolean isInvalidGrantError(Throwable t) {
+        while (t != null) {
+            String m = t.getMessage();
+            if (m != null && m.contains("invalid_grant")) {
+                return true;
+            }
+            t = t.getCause();
+        }
+        return false;
+    }
+
+    private IOException mapInvalidGrant(String userId, IOException e) {
+        if (isInvalidGrantError(e)) {
+            clearStoredCredentialQuietly(userId);
+            return new IOException(
+                    "Google Calendar session expired (invalid_grant). Open Calendar and connect Google again.", e);
+        }
+        return e;
     }
 
     public String createCalendarEventForTask(String userId, com.syllabussync.model.Task task, String courseName) throws IOException {
@@ -126,7 +170,11 @@ public class GoogleCalendarService {
 
         // Ensure token is fresh
         if (credential.getExpiresInSeconds() != null && credential.getExpiresInSeconds() <= 60) {
-            credential.refreshToken();
+            try {
+                credential.refreshToken();
+            } catch (IOException e) {
+                throw mapInvalidGrant(userId, e);
+            }
         }
 
         Calendar service = new Calendar.Builder(httpTransport, jsonFactory, credential)
@@ -177,8 +225,12 @@ public class GoogleCalendarService {
         
         event.setReminders(reminders);
 
-        Event createdEvent = service.events().insert("primary", event).execute();
-        return createdEvent.getId();
+        try {
+            Event createdEvent = service.events().insert("primary", event).execute();
+            return createdEvent.getId();
+        } catch (IOException e) {
+            throw mapInvalidGrant(userId, e);
+        }
     }
 
     public Map<String, Object> getTokenInfo(String userId) {

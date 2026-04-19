@@ -2,17 +2,15 @@ package com.syllabussync.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.syllabussync.model.Task;
 import com.syllabussync.model.TaskType;
 import com.syllabussync.model.Priority;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -25,20 +23,25 @@ import java.util.*;
 @Service
 public class ChatBotService {
 
-    @Value("${GEMINI_API_KEY}")
-    private String geminiApiKey;
-
     @Autowired
     private TaskService taskService;
 
     @Autowired
     private GoogleCalendarService googleCalendarService;
 
+    @Autowired
+    private GenerativeAiClient generativeAiClient;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     public Map<String, Object> processMessage(String message) {
         try {
+            if (!generativeAiClient.isConfigured()) {
+                return Map.of(
+                        "response",
+                        "AI is not configured. Set GOOGLE_CLOUD_PROJECT and Application Default Credentials "
+                                + "for Vertex AI, or set GEMINI_API_KEY for the Gemini API.");
+            }
             // Get current tasks to provide context to the AI
             List<Task> currentTasks = taskService.getAllTasks();
             
@@ -58,7 +61,7 @@ public class ChatBotService {
                     
                     // Try to sync to Google Calendar (use default user ID for now)
                     try {
-                        String eventId = googleCalendarService.createCalendarEvent("default_user", Map.of(
+                        String eventId = googleCalendarService.createCalendarEvent("default-user", Map.of(
                             "title", createdTask.getTitle(),
                             "courseName", createdTask.getCourse() != null ? createdTask.getCourse().getName() : "AI Assistant Tasks",
                             "type", createdTask.getType().toString(),
@@ -216,35 +219,26 @@ public class ChatBotService {
 
     private String callGeminiAPI(String message, List<Task> currentTasks) throws IOException, InterruptedException {
         String prompt = buildPrompt(message, currentTasks);
-        
-        String requestBody = String.format("""
-            {
-                "contents": [{
-                    "parts": [{
-                        "text": "%s"
-                    }]
-                }],
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "topK": 40,
-                    "topP": 0.95,
-                    "maxOutputTokens": 1024
-                }
-            }
-            """, prompt.replace("\"", "\\\""));
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + geminiApiKey))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
+        ObjectNode root = objectMapper.createObjectNode();
+        ArrayNode contents = root.putArray("contents");
+        ObjectNode content = contents.addObject();
+        content.put("role", "user");
+        ArrayNode parts = content.putArray("parts");
+        parts.addObject().put("text", prompt);
+        ObjectNode gen = root.putObject("generationConfig");
+        gen.put("temperature", 0.7);
+        gen.put("topK", 40);
+        gen.put("topP", 0.95);
+        gen.put("maxOutputTokens", 1024);
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        
+        String requestBody = objectMapper.writeValueAsString(root);
+        HttpResponse<String> response = generativeAiClient.generateContent(requestBody);
+
         if (response.statusCode() != 200) {
             throw new RuntimeException("Gemini API error: " + response.body());
         }
-        
+
         return response.body();
     }
 

@@ -1,82 +1,26 @@
-# SyllabusSync Troubleshooting Guide
+# Troubleshooting
 
-## Database Migration Issue (RESOLVED)
+## Backend won’t start
 
-### Problem
-The application was failing to start with the following error:
-```
-Migration V1__Create_initial_schema.sql failed
-SQL State  : 42001
-Error Code : 42001
-Message    : Syntax error in SQL statement "CREATE OR REPLACE FUNCTION update_updated_at_column()..."
-```
+- **Port 8080 in use:** stop the other process or change `server.port` in `application.yml`.
+- **Missing env vars:** copy `env.example` to `.env` and set at least `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (and AI keys if you use those features).
 
-### Root Cause
-The Flyway migration files contained PostgreSQL-specific syntax (like `BIGSERIAL`, `plpgsql` functions, and triggers) but the application was configured to use H2 database for development, which doesn't support PostgreSQL syntax.
+## Database (development)
 
-### Solution Applied
-1. **Removed Flyway migration files** - Deleted the `src/main/resources/db/migration/` directory
-2. **Configured JPA Auto-DDL** - Application now uses `hibernate.ddl-auto: create-drop` 
-3. **H2 Database Integration** - Tables are automatically created from JPA entities
+- Uses **H2 in-memory** with JPA `create-drop`. Console: `http://localhost:8080/h2-console` (JDBC URL from `application.yml`).
 
-### Current Configuration
-- **Development Database**: H2 (in-memory)
-- **Schema Management**: JPA Auto-DDL (create-drop)
-- **Console Access**: http://localhost:8080/h2-console
-- **Connection**: `jdbc:h2:mem:syllabussync` / username: `sa` / password: (empty)
+## Google Calendar OAuth
 
-## How to Run the Application
+- **Redirect URI** in Google Cloud must match **`GOOGLE_REDIRECT_URI`** (default: `http://localhost:8080/api/syllabus/auth/google/callback`).
+- **Testing mode:** add your Google account under OAuth consent screen → **Test users**.
+- **`invalid_grant` / 401 on token:** client ID/secret mismatch — update `.env`, clear `~/.credentials/syllabussync`, connect again.
+- **`ACCESS_TOKEN_SCOPE_INSUFFICIENT`:** add Calendar scopes on the OAuth consent screen, then clear stored credentials and reconnect.
 
-### Prerequisites
-- Java 17 or higher
-- Maven (or use included Maven wrapper)
+## Vertex / Gemini AI
 
-### Quick Start
-```bash
-# Navigate to backend directory
-cd backend
+- **Vertex:** `GOOGLE_CLOUD_PROJECT`, `VERTEX_API_KEY` (or ADC), Vertex AI API enabled, billing on the project.
+- **Gemini API key:** use `GEMINI_API_KEY` when not using Vertex for that path.
 
-# Build the application
-./mvnw clean package -DskipTests
+## Local task files
 
-# Run the application
-java -jar target/syllabussync-1.0.0.jar
-```
-
-### Verify Application is Running
-```bash
-# Health check endpoint
-curl http://localhost:8080/api/health
-
-# Expected response:
-# {"application":"SyllabusSync","version":"1.0.0","status":"UP","timestamp":"..."}
-
-# Hello endpoint
-curl http://localhost:8080/api/hello
-
-# Expected response:
-# {"message":"Hello from SyllabusSync!","status":"Working"}
-```
-
-### Available Endpoints
-- **Health Check**: `GET /api/health`
-- **Hello World**: `GET /api/hello`
-- **H2 Console**: `GET /h2-console` (development only)
-- **API Documentation**: `GET /swagger-ui.html`
-
-### Database Access
-1. Navigate to http://localhost:8080/h2-console
-2. Use connection settings:
-   - JDBC URL: `jdbc:h2:mem:syllabussync`
-   - User Name: `sa`
-   - Password: (leave empty)
-3. Click "Connect"
-
-### Production Deployment
-For production, the application is configured to use PostgreSQL. Update the `application.yml` profile to `production` and configure PostgreSQL connection details.
-
-## Commits Made
-1. **Initial Setup**: Complete project structure with Spring Boot backend and React frontend
-2. **Database Fix**: Resolved PostgreSQL/H2 compatibility issues by removing Flyway migrations
-
-The application now starts successfully and all endpoints are functional.
+- `backend/tasks.json` and `backend/courses.json` are **gitignored** local snapshots. They are created when you use the app.

@@ -32,8 +32,17 @@ const CalendarSync: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [syncedTasks, setSyncedTasks] = useState<any[]>([]);
 
-  // Check calendar connection status on component mount
+  // Check calendar connection status on component mount; handle return from Google OAuth
   React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthErr = params.get('calendar_error');
+    if (oauthErr) {
+      setError(decodeURIComponent(oauthErr));
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (params.get('calendar_connected') === '1') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
     checkCalendarStatus();
     fetchSyncedTasks();
   }, []);

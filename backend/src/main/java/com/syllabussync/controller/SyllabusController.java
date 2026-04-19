@@ -6,10 +6,15 @@ import com.syllabussync.service.GoogleCalendarService;
 import com.syllabussync.service.TaskService;
 import com.syllabussync.model.Task;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @RestController
@@ -28,6 +33,9 @@ public class SyllabusController {
     
     @Autowired
     private TaskService taskService;
+
+    @Value("${app.google.calendar.oauth-success-redirect:http://localhost:3000/calendar}")
+    private String calendarOauthSuccessRedirect;
     
     // Google Calendar OAuth endpoints
     @GetMapping("/auth/google/url")
@@ -42,14 +50,33 @@ public class SyllabusController {
     }
     
     @GetMapping("/auth/google/callback")
-    public ResponseEntity<Map<String, Object>> handleGoogleCallback(
-            @RequestParam("code") String code) {
+    public ResponseEntity<Void> handleGoogleCallback(
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "error", required = false) String oauthError,
+            @RequestParam(value = "error_description", required = false) String errorDescription) {
+        String base = calendarOauthSuccessRedirect;
         try {
-            String result = googleCalendarService.handleCallback(code, "default-user");
-            return ResponseEntity.ok(Map.of("message", result));
+            if (oauthError != null && !oauthError.isBlank()) {
+                String msg = (errorDescription != null && !errorDescription.isBlank()) ? errorDescription : oauthError;
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(URI.create(base + "?calendar_error=" + URLEncoder.encode(msg, StandardCharsets.UTF_8)))
+                        .build();
+            }
+            if (code == null || code.isBlank()) {
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(URI.create(base + "?calendar_error="
+                                + URLEncoder.encode("missing authorization code", StandardCharsets.UTF_8)))
+                        .build();
+            }
+            googleCalendarService.handleCallback(code, "default-user");
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(base + "?calendar_connected=1"))
+                    .build();
         } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                .body(Map.of("error", "Failed to handle callback: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(base + "?calendar_error="
+                            + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8)))
+                    .build();
         }
     }
     

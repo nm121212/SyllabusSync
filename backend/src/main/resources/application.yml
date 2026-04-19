@@ -46,17 +46,22 @@ spring:
 # 2. Create a new project or select existing
 # 3. Enable Google Calendar API
 # 4. Create OAuth 2.0 credentials
-# 5. Add http://localhost:8080/auth/google/callback as authorized redirect URI
+# 5. Add the same URI under OAuth client "Authorized redirect URIs" in Google Cloud Console
 google:
   client-id: ${GOOGLE_CLIENT_ID}
   client-secret: ${GOOGLE_CLIENT_SECRET}
-  redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/auth/google/callback}
+  redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/api/syllabus/auth/google/callback}
   
-  # Gemini AI API for intelligent parsing
+  # Gemini: use Vertex AI (GCP credits) when GOOGLE_CLOUD_PROJECT is set; else consumer API with GEMINI_API_KEY
   gemini:
-    api-key: ${GEMINI_API_KEY}
-    model: gemini-2.5-flash
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
     max-tokens: 4096
+  vertex:
+    project-id: ${GOOGLE_CLOUD_PROJECT:}
+    location: ${VERTEX_AI_LOCATION:us-central1}
+    # Optional: GCP API key (Credentials → API key, restricted to Vertex AI). Uses key= on the request; no OAuth needed.
+    api-key: ${VERTEX_API_KEY:${GOOGLE_API_KEY:}}
 
 # JWT Configuration
 jwt:
@@ -140,6 +145,8 @@ app:
   google:
     calendar:
       timezone: America/New_York
+      # Browser redirect after Google OAuth (Calendar page in the React app)
+      oauth-success-redirect: ${CALENDAR_OAUTH_SUCCESS_URL:http://localhost:3000/calendar}
       default-reminders:
         - days: 7
         - days: 3

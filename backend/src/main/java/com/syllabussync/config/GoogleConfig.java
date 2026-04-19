@@ -7,9 +7,6 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
-import com.google.api.services.calendar.Calendar;
-import com.google.api.services.calendar.CalendarScopes;
-import com.google.api.services.oauth2.Oauth2Scopes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,14 +26,20 @@ public class GoogleConfig {
     @Value("${google.client-secret}")
     private String clientSecret;
 
-    @Value("${google.redirect-uri:http://localhost:8080/auth/google/callback}")
+    @Value("${google.redirect-uri:http://localhost:8080/api/syllabus/auth/google/callback}")
     private String redirectUri;
 
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
+
+    /**
+     * Explicit URLs — Events.Insert needs calendar write access (not calendar.readonly).
+     * Must match scopes added under OAuth consent screen → Data access / Scopes in Google Cloud Console.
+     */
     private static final List<String> SCOPES = Arrays.asList(
-        CalendarScopes.CALENDAR,
-        Oauth2Scopes.USERINFO_EMAIL,
-        Oauth2Scopes.USERINFO_PROFILE
+            "https://www.googleapis.com/auth/calendar",
+            "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile"
     );
 
     @Bean

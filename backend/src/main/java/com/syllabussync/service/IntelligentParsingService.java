@@ -4,34 +4,29 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.URI;
 import java.util.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 
 @Service
 public class IntelligentParsingService {
 
-    @Value("${google.gemini.api-key:}")
-    private String geminiApiKey;
-
-    @Value("${google.gemini.model:gemini-2.5-flash}")
-    private String model;
+    private final GenerativeAiClient generativeAiClient;
 
     @Value("${google.gemini.max-tokens:4096}")
     private int maxTokens;
 
+    public IntelligentParsingService(GenerativeAiClient generativeAiClient) {
+        this.generativeAiClient = generativeAiClient;
+    }
+
     public Map<String, Object> parseFile(MultipartFile file) throws IOException {
-        if (geminiApiKey == null || geminiApiKey.trim().isEmpty()) {
+        if (!generativeAiClient.isConfigured()) {
             throw new RuntimeException("Gemini API key not configured");
         }
         
@@ -102,6 +97,7 @@ public class IntelligentParsingService {
             JsonObject requestPayload = new JsonObject();
             JsonArray contents = new JsonArray();
             JsonObject content = new JsonObject();
+            content.addProperty("role", "user");
             JsonArray parts = new JsonArray();
             
             // Add text prompt
@@ -121,16 +117,7 @@ public class IntelligentParsingService {
             contents.add(content);
             requestPayload.add("contents", contents);
             
-            // Create HTTP request
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + geminiApiKey))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(new Gson().toJson(requestPayload)))
-                    .build();
-            
-            // Send request and get response
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = generativeAiClient.generateContent(new Gson().toJson(requestPayload));
             
             if (response.statusCode() != 200) {
                 throw new IOException("Gemini API returned status: " + response.statusCode() + ", body: " + response.body());
