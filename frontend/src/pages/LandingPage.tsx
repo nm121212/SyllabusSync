@@ -24,6 +24,9 @@ import { useTasks } from '../contexts/TasksContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import GoogleSignInButton from '../components/GoogleSignInButton.tsx';
+import EditTaskDialog, {
+  type EditableTask,
+} from '../components/EditTaskDialog.tsx';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Decorative concentric-wave blob (pure SVG)
@@ -306,6 +309,7 @@ interface BackendTask {
   status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   priority?: string;
   googleEventId?: string;
+  description?: string;
   updatedAt?: string;
   createdAt?: string;
 }
@@ -444,6 +448,19 @@ const formatShortDate = (iso: string): string => {
   });
 };
 
+const calendarTaskToEditable = (t: CalendarTask): EditableTask | null => {
+  const id = typeof t.id === 'number' ? t.id : Number(t.id);
+  if (Number.isNaN(id)) return null;
+  return {
+    id,
+    title: t.title,
+    description: t.description,
+    dueDate: t.dueDate,
+    type: t.type,
+    priority: t.priority,
+  };
+};
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Page
  * ────────────────────────────────────────────────────────────────────────── */
@@ -452,6 +469,9 @@ const LandingPage: React.FC = () => {
   const { version, bumpVersion } = useTasks();
   const stats = useLiveStats(version);
   const { session } = useAuth();
+  const [calendarEditTask, setCalendarEditTask] = useState<EditableTask | null>(
+    null
+  );
 
   const scrollToId = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -1089,6 +1109,10 @@ const LandingPage: React.FC = () => {
                         tasks={(stats.tasks ?? []) as CalendarTask[]}
                         variant="full"
                         framed={false}
+                        onTaskClick={(t) => {
+                          const e = calendarTaskToEditable(t);
+                          if (e) setCalendarEditTask(e);
+                        }}
                       />
                     </CardContent>
                   </Grid>
@@ -1176,6 +1200,16 @@ const LandingPage: React.FC = () => {
           </Box>
         </Container>
       </Box>
+
+      <EditTaskDialog
+        open={calendarEditTask !== null}
+        task={calendarEditTask}
+        onClose={() => setCalendarEditTask(null)}
+        onSaved={() => {
+          setCalendarEditTask(null);
+          bumpVersion();
+        }}
+      />
     </Box>
   );
 };

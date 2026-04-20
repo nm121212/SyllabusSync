@@ -1,5 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Box, IconButton, Typography, Tooltip } from '@mui/material';
+import {
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+  Typography,
+  Tooltip,
+} from '@mui/material';
 import { ChevronLeft, ChevronRight, CheckCircle } from '@mui/icons-material';
 
 export interface CalendarTask {
@@ -11,6 +18,7 @@ export interface CalendarTask {
   priority?: string;
   status?: string;
   googleEventId?: string;
+  description?: string;
 }
 
 interface TaskCalendarProps {
@@ -19,6 +27,8 @@ interface TaskCalendarProps {
   variant?: 'full' | 'compact';
   /** When false, render without outer card chrome (for split-layout embedding). */
   framed?: boolean;
+  /** When set, task chips are clickable to edit (e.g. open the same dialog as the task list). */
+  onTaskClick?: (task: CalendarTask) => void;
 }
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -67,8 +77,13 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
   tasks,
   variant = 'full',
   framed = true,
+  onTaskClick,
 }) => {
   const compact = variant === 'compact';
+  const [moreMenu, setMoreMenu] = useState<{
+    anchor: HTMLElement;
+    dayTasks: CalendarTask[];
+  } | null>(null);
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -331,6 +346,7 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
                     const accent = colorFor(t);
                     const synced = !!t.googleEventId;
                     const done = t.status === 'COMPLETED';
+                    const clickable = Boolean(onTaskClick);
                     return (
                       <Tooltip
                         key={t.id}
@@ -351,10 +367,42 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
                               {t.courseName || 'Personal'}
                               {t.type ? ` · ${t.type}` : ''}
                             </Typography>
+                            {clickable && (
+                              <Typography
+                                sx={{
+                                  fontSize: 10,
+                                  color: 'rgba(255,255,255,0.55)',
+                                  mt: 0.5,
+                                }}
+                              >
+                                Click to edit
+                              </Typography>
+                            )}
                           </Box>
                         }
                       >
                         <Box
+                          role={clickable ? 'button' : undefined}
+                          tabIndex={clickable ? 0 : undefined}
+                          onClick={
+                            clickable
+                              ? (e) => {
+                                  e.stopPropagation();
+                                  onTaskClick(t);
+                                }
+                              : undefined
+                          }
+                          onKeyDown={
+                            clickable
+                              ? (e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onTaskClick(t);
+                                  }
+                                }
+                              : undefined
+                          }
                           sx={{
                             display: 'flex',
                             alignItems: 'center',
@@ -374,6 +422,18 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
                             textOverflow: 'ellipsis',
                             opacity: done ? 0.55 : 1,
                             textDecoration: done ? 'line-through' : 'none',
+                            cursor: clickable ? 'pointer' : 'default',
+                            width: '100%',
+                            textAlign: 'left',
+                            font: 'inherit',
+                            ...(clickable
+                              ? {
+                                  '&:hover': {
+                                    borderColor: `${accent}99`,
+                                    background: `${accent}33`,
+                                  },
+                                }
+                              : {}),
                           }}
                         >
                           <Box
@@ -411,10 +471,40 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
                   })}
                   {dayTasks.length > 2 && (
                     <Typography
+                      role={onTaskClick ? 'button' : undefined}
+                      tabIndex={onTaskClick ? 0 : undefined}
+                      onClick={
+                        onTaskClick
+                          ? (e) => {
+                              e.stopPropagation();
+                              setMoreMenu({
+                                anchor: e.currentTarget,
+                                dayTasks,
+                              });
+                            }
+                          : undefined
+                      }
+                      onKeyDown={
+                        onTaskClick
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setMoreMenu({
+                                  anchor: e.currentTarget as HTMLElement,
+                                  dayTasks,
+                                });
+                              }
+                            }
+                          : undefined
+                      }
                       sx={{
                         fontSize: 10,
                         color: 'rgba(255,255,255,0.55)',
                         pl: 0.5,
+                        cursor: onTaskClick ? 'pointer' : 'default',
+                        '&:hover': onTaskClick
+                          ? { color: 'rgba(255,255,255,0.85)' }
+                          : {},
                       }}
                     >
                       +{dayTasks.length - 2} more
@@ -479,6 +569,33 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
             synced to Google
           </Box>
         </Box>
+      )}
+
+      {onTaskClick && (
+        <Menu
+          open={Boolean(moreMenu)}
+          anchorEl={moreMenu?.anchor ?? null}
+          onClose={() => setMoreMenu(null)}
+          PaperProps={{
+            sx: {
+              bgcolor: '#141127',
+              border: '1px solid rgba(139,92,246,0.22)',
+              minWidth: 200,
+            },
+          }}
+        >
+          {(moreMenu?.dayTasks ?? []).slice(2).map((t) => (
+            <MenuItem
+              key={String(t.id)}
+              onClick={() => {
+                onTaskClick(t);
+                setMoreMenu(null);
+              }}
+            >
+              {t.title}
+            </MenuItem>
+          ))}
+        </Menu>
       )}
     </Box>
   );
