@@ -54,3 +54,4 @@ uploads/
 tmp/
 temp/
 *.tgz
+.vercel
