@@ -3,7 +3,6 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { Box, Button, Container, Grid, Typography } from '@mui/material';
 import {
   CalendarMonth,
-  SmartToy,
   ArrowForward,
   TaskAlt,
   InsertDriveFileOutlined,
@@ -143,7 +142,18 @@ const FeatureCard: React.FC<{
   accent: string;
   onClick?: () => void;
   cta: string;
-}> = ({ icon, title, description, bullets, accent, onClick, cta }) => (
+  /** Use when the icon is already full-color (e.g. PulseChatIcon). */
+  iconSurface?: 'gradient' | 'plain';
+}> = ({
+  icon,
+  title,
+  description,
+  bullets,
+  accent,
+  onClick,
+  cta,
+  iconSurface = 'gradient',
+}) => (
   <Box
     onClick={onClick}
     role={onClick ? 'button' : undefined}
@@ -192,8 +202,15 @@ const FeatureCard: React.FC<{
         placeItems: 'center',
         mb: 2.5,
         color: '#fff',
-        background: `linear-gradient(135deg, ${accent} 0%, #7c6cff 100%)`,
-        boxShadow: `0 12px 30px -12px ${accent}AA`,
+        ...(iconSurface === 'plain'
+          ? {
+              background: 'transparent',
+              boxShadow: `0 12px 30px -12px ${accent}66`,
+            }
+          : {
+              background: `linear-gradient(135deg, ${accent} 0%, #7c6cff 100%)`,
+              boxShadow: `0 12px 30px -12px ${accent}AA`,
+            }),
       }}
     >
       {icon}
@@ -960,7 +977,8 @@ const LandingPage: React.FC = () => {
           <Grid container spacing={3} sx={{ mt: { xs: 4, md: 6 } }}>
             <Grid item xs={12} md={3}>
               <FeatureCard
-                icon={<SmartToy />}
+                icon={<PulseChatIcon size={52} />}
+                iconSurface="plain"
                 title="Chat-first scheduling"
                 description="Ask in plain English. Cadence parses intent, dates and durations - and schedules it for you."
                 bullets={[

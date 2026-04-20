@@ -17,7 +17,6 @@ import {
   Close as CloseIcon,
   HomeOutlined,
   CalendarMonth,
-  TaskAltOutlined,
   CloudUploadOutlined,
   TuneOutlined,
   Sync as SyncIcon,
@@ -231,14 +230,14 @@ const NavButton: React.FC<{
   );
 };
 
-/** Tasks + Calendar grouped in one bordered block (scroll to #tasks / #calendar). */
+/** Calendar shortcut (scroll to #calendar); highlight when plan section is in view. */
 const PlanNavGroup: React.FC<{
   collapsed: boolean;
   activeHash: string;
   onHashNavigate: (hash: string) => void;
 }> = ({ collapsed, activeHash, onHashNavigate }) => {
-  const tasksActive = activeHash === 'tasks';
-  const calActive = activeHash === 'calendar';
+  const planSectionActive =
+    activeHash === 'calendar' || activeHash === 'tasks';
 
   const subRow = (
     label: string,
@@ -257,9 +256,9 @@ const PlanNavGroup: React.FC<{
         display: 'flex',
         alignItems: 'center',
         gap: 1.5,
-        px: collapsed ? 1.25 : 1.5,
-        py: 0.85,
-        borderRadius: 2,
+        px: collapsed ? 1.25 : 1.75,
+        py: 1.1,
+        borderRadius: 2.5,
         cursor: 'pointer',
         color: active ? '#fff' : 'rgba(255,255,255,0.68)',
         background: active
@@ -291,7 +290,7 @@ const PlanNavGroup: React.FC<{
       {!collapsed && (
         <Typography
           sx={{
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: active ? 600 : 500,
             letterSpacing: '-0.005em',
           }}
@@ -302,67 +301,22 @@ const PlanNavGroup: React.FC<{
     </Box>
   );
 
-  const groupInner = (
-    <Box
-      sx={{
-        borderRadius: 2.5,
-        border: '1px solid rgba(139, 92, 246, 0.28)',
-        background: 'rgba(124, 108, 255, 0.05)',
-        p: collapsed ? 0.35 : 0.5,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0.35,
-      }}
-    >
-      {subRow('Tasks', 'tasks', <TaskAltOutlined sx={{ fontSize: 20 }} />, tasksActive)}
-      {subRow(
-        'Calendar',
-        'calendar',
-        <CalendarMonth sx={{ fontSize: 20 }} />,
-        calActive
-      )}
-    </Box>
+  const row = subRow(
+    'Calendar',
+    'calendar',
+    <CalendarMonth sx={{ fontSize: 20 }} />,
+    planSectionActive
   );
 
   if (collapsed) {
     return (
-      <Tooltip title="Tasks & calendar" placement="right">
-        <Box
-          onClick={() => onHashNavigate('tasks')}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) =>
-            e.key === 'Enter' ? onHashNavigate('tasks') : undefined
-          }
-          sx={{
-            borderRadius: 2.5,
-            border: '1px solid rgba(139, 92, 246, 0.28)',
-            background: 'rgba(124, 108, 255, 0.05)',
-            py: 0.75,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            cursor: 'pointer',
-            '&:hover': { background: 'rgba(124, 108, 255, 0.12)' },
-          }}
-        >
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateRows: '11px 11px',
-              gap: '3px',
-              justifyItems: 'center',
-            }}
-          >
-            <TaskAltOutlined sx={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} />
-            <CalendarMonth sx={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} />
-          </Box>
-        </Box>
+      <Tooltip title="Calendar" placement="right">
+        {row}
       </Tooltip>
     );
   }
 
-  return groupInner;
+  return row;
 };
 
 /* ──────────────────────────────────────────────────────────────────────── */

@@ -11,7 +11,6 @@ import {
 } from '@mui/material';
 import {
   Send,
-  SmartToy,
   Person,
   CalendarMonth,
   AutoAwesome,
@@ -25,6 +24,7 @@ import {
 } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
 import { API_BASE_URL } from '../config/api.ts';
+import PulseChatIcon from './icons/PulseChatIcon.tsx';
 
 export interface ChatMessage {
   id: string;
@@ -226,16 +226,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             background: 'rgba(124, 108, 255, 0.06)',
           }}
         >
-          <Avatar
+          <Box
             sx={{
-              width: 36,
-              height: 36,
-              background: C.gradient,
-              boxShadow: '0 8px 24px -12px rgba(124,108,255,0.7)',
+              flexShrink: 0,
+              lineHeight: 0,
+              filter: 'drop-shadow(0 8px 24px rgba(124,108,255,0.45))',
             }}
           >
-            <SmartToy sx={{ fontSize: 20, color: '#fff' }} />
-          </Avatar>
+            <PulseChatIcon size={36} />
+          </Box>
           <Box sx={{ flexGrow: 1 }}>
             <Typography
               sx={{
@@ -374,17 +373,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 }}
               >
                 {m.sender === 'bot' && (
-                  <Avatar
+                  <Box
                     sx={{
                       width: 28,
                       height: 28,
                       mt: 0.25,
-                      background: C.gradient,
-                      border: `1px solid ${C.border}`,
+                      flexShrink: 0,
+                      lineHeight: 0,
+                      borderRadius: '8px',
+                      boxShadow: `0 0 0 1px ${C.border}`,
                     }}
                   >
-                    <SmartToy sx={{ fontSize: 15, color: '#fff' }} />
-                  </Avatar>
+                    <PulseChatIcon size={28} />
+                  </Box>
                 )}
 
                 <Box sx={{ maxWidth: 'min(100%, 560px)' }}>
@@ -533,15 +534,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   width: '100%',
                 }}
               >
-                <Avatar
+                <Box
                   sx={{
                     width: 28,
                     height: 28,
-                    background: C.gradient,
+                    flexShrink: 0,
+                    lineHeight: 0,
+                    borderRadius: '8px',
                   }}
                 >
-                  <SmartToy sx={{ fontSize: 15, color: '#fff' }} />
-                </Avatar>
+                  <PulseChatIcon size={28} />
+                </Box>
                 <Box
                   sx={{
                     px: 2,
