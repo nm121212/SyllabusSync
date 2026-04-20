@@ -421,14 +421,24 @@ docker build -t syllabussync-backend ./backend
 docker build -t syllabussync-frontend ./frontend
 ```
 
-### Production Environment
+### Vercel (React frontend)
 
-1. **Database**: Set up PostgreSQL with proper backup strategy
-2. **Backend**: Deploy Spring Boot JAR to cloud platform (AWS, Heroku, etc.)
-3. **Frontend**: Build and deploy to CDN or static hosting
-4. **Environment**: Configure production environment variables
-5. **SSL**: Set up HTTPS certificates
-6. **Monitoring**: Configure logging and monitoring
+The UI is a Create React App static build. **Vercel does not run the Spring Boot API**; host the backend separately (Docker, Railway, Render, Fly.io, etc.).
+
+1. In Vercel, set the project **Root Directory** to `frontend`.
+2. Under **Settings → Environment Variables**, set (at least for **Production**):
+   - `REACT_APP_API_BASE_URL` — your public API base, including `/api` (for example `https://api.yourdomain.com/api`).
+   - `REACT_APP_GOOGLE_CLIENT_ID` — same OAuth Web client ID as in Google Cloud Console, if the UI needs it.
+3. Redeploy after changing env vars (values are baked in at build time).
+4. On the **backend**, set `GOOGLE_REDIRECT_URI` and `CALENDAR_OAUTH_SUCCESS_URL` to your production API callback and frontend URLs (for example `https://your-app.vercel.app/calendar`). Add those URLs in the Google Cloud OAuth client (authorized JavaScript origins and redirect URIs).
+
+### Production environment (checklist)
+
+1. **Database**: PostgreSQL with backups and connection string on the backend host.
+2. **Backend**: Spring Boot with `JWT_SECRET`, Google credentials, and `application` profile appropriate for production.
+3. **Frontend**: Static hosting (Vercel or any CDN) with `REACT_APP_*` build-time variables.
+4. **SSL**: HTTPS on both frontend and API.
+5. **Monitoring**: Logs and health checks (`/actuator/health` on the API).
 
 ## 🤝 Contributing
 
