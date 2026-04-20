@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Avatar,
   Box,
-  Button,
   IconButton,
   Menu,
   MenuItem,
@@ -16,7 +15,7 @@ import GoogleSignInButton from './GoogleSignInButton.tsx';
 /**
  * Top-right auth widget used in the app shell. Two states:
  *   • Signed out → compact "Sign up / Sign in" Google OAuth button.
- *   • Signed in  → explicit "Sign out" button + avatar menu.
+ *   • Signed in  → avatar menu (Settings + Sign out).
  *
  * We deliberately render nothing while the first session fetch is in
  * flight so there's no flicker from the auth button → avatar on every reload.
@@ -55,26 +54,6 @@ const UserMenu: React.FC = () => {
 
   return (
     <>
-      <Button
-        variant="outlined"
-        size="small"
-        onClick={async () => {
-          await signOut();
-        }}
-        sx={{
-          borderColor: 'rgba(139, 92, 246, 0.45)',
-          color: '#ffd3d3',
-          borderRadius: 999,
-          px: 1.75,
-          '&:hover': {
-            borderColor: 'rgba(255, 120, 120, 0.7)',
-            background: 'rgba(255, 120, 120, 0.08)',
-          },
-        }}
-      >
-        Sign out
-      </Button>
-
       <IconButton
         onClick={(e) => setAnchorEl(e.currentTarget)}
         size="small"
