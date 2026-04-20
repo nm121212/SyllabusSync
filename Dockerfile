@@ -19,13 +19,15 @@ FROM eclipse-temurin:17-jre-jammy
 
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -r syllabussync && useradd -r -g syllabussync syllabussync
+RUN groupadd -r syllabussync \
+  && useradd -r -g syllabussync -m -d /home/syllabussync syllabussync
 
 WORKDIR /app
 
 COPY --from=builder /app/target/syllabussync-*.jar app.jar
 
-RUN mkdir -p /app/uploads && chown -R syllabussync:syllabussync /app
+RUN mkdir -p /app/uploads /home/syllabussync/.credentials/syllabussync \
+  && chown -R syllabussync:syllabussync /app /home/syllabussync
 
 USER syllabussync
 
