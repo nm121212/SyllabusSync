@@ -69,10 +69,7 @@ public class TaskService {
 
         Course course = getOrCreateCourse(courseName);
 
-        Map<Long, Task> userTasks = tasksByUser.computeIfAbsent(userId, k -> {
-            loadTasksFromFile(k);
-            return tasksByUser.computeIfAbsent(k, x -> new ConcurrentHashMap<>());
-        });
+        Map<Long, Task> userTasks = userBucket(userId);
         Map<String, List<Task>> userCourseTasks =
                 tasksByUserCourse.computeIfAbsent(userId, k -> new ConcurrentHashMap<>());
 
@@ -226,10 +223,24 @@ public class TaskService {
 
     private Map<Long, Task> userBucket(String userId) {
         Objects.requireNonNull(userId, "userId is required");
-        return tasksByUser.computeIfAbsent(userId, k -> {
-            loadTasksFromFile(k);
-            return tasksByUser.computeIfAbsent(k, x -> new ConcurrentHashMap<>());
-        });
+        Map<Long, Task> existing = tasksByUser.get(userId);
+        if (existing != null) {
+            return existing;
+        }
+        synchronized (this) {
+            existing = tasksByUser.get(userId);
+            if (existing != null) {
+                return existing;
+            }
+            loadTasksFromFile(userId);
+            existing = tasksByUser.get(userId);
+            if (existing == null) {
+                existing = new ConcurrentHashMap<>();
+                tasksByUser.put(userId, existing);
+            }
+            tasksByUserCourse.computeIfAbsent(userId, k -> new ConcurrentHashMap<>());
+            return existing;
+        }
     }
 
     private long nextId(String userId) {
