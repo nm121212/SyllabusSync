@@ -151,10 +151,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     setError(null);
 
     try {
+      const history = messages
+        .filter((m) => m.id !== 'greet')
+        .slice(-20)
+        .map((m) => ({ role: m.sender, text: m.text }));
+
       const res = await fetch(`${API_BASE_URL}/chatbot/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, history }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

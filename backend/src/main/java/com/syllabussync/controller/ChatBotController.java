@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -24,17 +25,18 @@ public class ChatBotController {
     private CurrentUserResolver currentUserResolver;
 
     @PostMapping("/process")
-    public ResponseEntity<Map<String, Object>> processMessage(@RequestBody Map<String, String> request) {
+    public ResponseEntity<Map<String, Object>> processMessage(@RequestBody Map<String, Object> request) {
         try {
-            String message = request.get("message");
+            String message = (String) request.get("message");
             if (message == null || message.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Message cannot be empty"
-                ));
+                return ResponseEntity.badRequest().body(Map.of("error", "Message cannot be empty"));
             }
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> history =
+                    (List<Map<String, String>>) request.getOrDefault("history", List.of());
 
             String userId = currentUserResolver.requireUserId();
-            Map<String, Object> response = chatBotService.processMessage(userId, message);
+            Map<String, Object> response = chatBotService.processMessage(userId, message, history);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of(

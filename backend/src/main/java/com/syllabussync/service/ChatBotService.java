@@ -44,7 +44,7 @@ public class ChatBotService {
         return PromptDateTimeHelper.safeZone(calendarTimezone);
     }
 
-    public Map<String, Object> processMessage(String userId, String message) {
+    public Map<String, Object> processMessage(String userId, String message, List<Map<String, String>> history) {
         try {
             if (!generativeAiClient.isConfigured()) {
                 return Map.of(
@@ -56,8 +56,8 @@ public class ChatBotService {
             // advises one user using another user's calendar.
             List<Task> currentTasks = taskService.getAllTasks(userId);
             
-            // Send message to Gemini AI with task context
-            String geminiResponse = callGeminiAPI(message, currentTasks);
+            // Send message to Gemini AI with task context and conversation history
+            String geminiResponse = callGeminiAPI(message, currentTasks, history);
             
             // Parse the response
             Map<String, Object> parsedResponse = parseGeminiResponse(geminiResponse);
@@ -111,7 +111,7 @@ public class ChatBotService {
         }
     }
 
-    private String buildPrompt(String userMessage, List<Task> currentTasks) {
+    private String buildSystemPrompt(List<Task> currentTasks) {
         // Format current tasks for context
         String tasksContext = "";
         if (currentTasks != null && !currentTasks.isEmpty()) {
@@ -225,20 +225,45 @@ public class ChatBotService {
             - Reference specific tasks when relevant to help with prioritization and planning
             
             %s
-            
-            Current user message: %s
-            """, dateContext, tasksContext, userMessage);
+            """, dateContext, tasksContext);
     }
 
-    private String callGeminiAPI(String message, List<Task> currentTasks) throws IOException, InterruptedException {
-        String prompt = buildPrompt(message, currentTasks);
+    private String callGeminiAPI(String message, List<Task> currentTasks, List<Map<String, String>> history)
+            throws IOException, InterruptedException {
+        String systemPrompt = buildSystemPrompt(currentTasks);
 
         ObjectNode root = objectMapper.createObjectNode();
         ArrayNode contents = root.putArray("contents");
-        ObjectNode content = contents.addObject();
-        content.put("role", "user");
-        ArrayNode parts = content.putArray("parts");
-        parts.addObject().put("text", prompt);
+
+        List<Map<String, String>> trimmedHistory = history == null ? List.of()
+                : history.subList(Math.max(0, history.size() - 20), history.size());
+
+        if (trimmedHistory.isEmpty()) {
+            // Single turn: system prompt + current message in one user turn
+            ObjectNode turn = contents.addObject();
+            turn.put("role", "user");
+            turn.putArray("parts").addObject().put("text", systemPrompt + "\n\n" + message);
+        } else {
+            // Multi-turn: prepend system prompt to the first user turn in history
+            boolean systemInjected = false;
+            for (Map<String, String> turn : trimmedHistory) {
+                String role = "bot".equals(turn.get("role")) ? "model" : "user";
+                String text = turn.getOrDefault("text", "");
+                ObjectNode node = contents.addObject();
+                node.put("role", role);
+                String partText = text;
+                if (!systemInjected && "user".equals(role)) {
+                    partText = systemPrompt + "\n\n" + text;
+                    systemInjected = true;
+                }
+                node.putArray("parts").addObject().put("text", partText);
+            }
+            // Current message as the final user turn
+            ObjectNode cur = contents.addObject();
+            cur.put("role", "user");
+            cur.putArray("parts").addObject().put("text", message);
+        }
+
         ObjectNode gen = root.putObject("generationConfig");
         gen.put("temperature", 0.7);
         gen.put("topK", 40);
