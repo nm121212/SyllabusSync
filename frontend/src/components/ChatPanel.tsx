@@ -14,13 +14,10 @@ import {
   Person,
   CalendarMonth,
   AutoAwesome,
-  Add,
-  ExpandMore,
   EventOutlined,
   NotificationsActiveOutlined,
   ViewWeekOutlined,
   SearchOutlined,
-  MicNoneOutlined,
 } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
 import { API_BASE_URL } from '../config/api.ts';
@@ -680,6 +677,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             sx={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'flex-end',
               gap: 1,
               px: 1.25,
               py: 1,
@@ -687,58 +685,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               background: 'rgba(124, 108, 255, 0.04)',
             }}
           >
-            <IconButton
-              size="small"
-              aria-label="Add"
-              sx={{
-                color: C.textMute,
-                flexShrink: 0,
-                '&:hover': { color: C.purpleSoft, bgcolor: 'rgba(124,108,255,0.1)' },
-              }}
-            >
-              <Add fontSize="small" />
-            </IconButton>
-            <Box
-              sx={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 0.75,
-                minWidth: 0,
-              }}
-            >
-              <Box
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 0.25,
-                  px: 1.25,
-                  py: 0.45,
-                  borderRadius: 999,
-                  border: `1px solid ${C.border}`,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: C.textMute,
-                  bgcolor: 'rgba(20,17,39,0.65)',
-                }}
-              >
-                Day planner
-                <ExpandMore sx={{ fontSize: 18, opacity: 0.75 }} />
-              </Box>
-              <IconButton
-                size="small"
-                aria-label="Voice (coming soon)"
-                disabled
-                sx={{
-                  color: C.textMute,
-                  display: { xs: 'none', sm: 'inline-flex' },
-                  opacity: 0.45,
-                }}
-              >
-                <MicNoneOutlined sx={{ fontSize: 20 }} />
-              </IconButton>
-            </Box>
             <IconButton
               onClick={() => send()}
               disabled={!inputText.trim() || loading}
