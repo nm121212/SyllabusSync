@@ -10,8 +10,8 @@ import {
 import { useAuth } from '../contexts/AuthContext.tsx';
 
 /**
- * Shown when a signed-out user tries calendar sync. Supabase session is
- * required before Google Calendar OAuth and task push endpoints work.
+ * Shown when a signed-out user tries calendar sync. Sign-in is required
+ * before Google Calendar OAuth and task push endpoints work.
  */
 export const SyncRequiresSignInDialog: React.FC<{
   open: boolean;
@@ -63,7 +63,7 @@ export const SyncRequiresSignInDialog: React.FC<{
 };
 
 /**
- * Returns a guard: if the user has a Supabase session, runs `fn`;
+ * Returns a guard: if the user is signed in, runs `fn`;
  * otherwise opens the sign-in dialog. Skips while auth is still loading.
  */
 export function useSyncSignInPrompt() {
@@ -87,7 +87,6 @@ export function useSyncSignInPrompt() {
     guardOr,
     promptOpen: open,
     setPromptOpen: setOpen,
-    /** True while the initial Supabase session fetch is in flight. */
     authLoading: loading,
   };
 }

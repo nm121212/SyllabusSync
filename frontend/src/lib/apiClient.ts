@@ -1,16 +1,11 @@
 import { API_BASE_URL } from '../config/api.ts';
-import { supabase } from './supabaseClient.ts';
+
+const TOKEN_KEY = 'syllabussync_token';
 
 /**
- * Install a one-time `fetch` interceptor that injects the current Supabase
- * access token as a Bearer header on every request to our backend.
- *
- * Done as a global wrap (rather than touching every `fetch(...)` call site)
- * so existing code keeps working unchanged and *any* future fetch that hits
- * `API_BASE_URL` is automatically authenticated. Non-backend fetches (CDN
- * assets, third-party APIs) are passed through untouched.
- *
- * Call this once from `src/index.tsx` before the React tree mounts.
+ * Install a one-time fetch interceptor that injects the stored JWT as a
+ * Bearer header on every request to the backend. Non-backend fetches pass
+ * through untouched. Call once from src/index.tsx before the React tree mounts.
  */
 export function installAuthFetch(): void {
   if (typeof window === 'undefined') return;
@@ -30,7 +25,6 @@ export function installAuthFetch(): void {
           : input.url;
       if (!url) return false;
       if (url.startsWith(API_BASE_URL)) return true;
-      // Relative /api/... calls also hit the backend via the dev proxy.
       if (url.startsWith('/api/')) return true;
       return false;
     } catch {
@@ -39,12 +33,15 @@ export function installAuthFetch(): void {
   };
 
   window.fetch = async (input, init) => {
-    if (!isBackendUrl(input) || !supabase) {
+    if (!isBackendUrl(input)) {
       return originalFetch(input as RequestInfo, init);
     }
 
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+    let token: string | null = null;
+    try {
+      token = localStorage.getItem(TOKEN_KEY);
+    } catch {}
+
     if (!token) {
       return originalFetch(input as RequestInfo, init);
     }

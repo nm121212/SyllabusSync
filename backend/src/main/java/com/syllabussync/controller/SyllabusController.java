@@ -109,7 +109,7 @@ public class SyllabusController {
             if (u == null) {
                 return ResponseEntity.ok(Map.of("connected", false));
             }
-            boolean isConnected = googleCalendarService.isUserConnected(u.supabaseUserId());
+            boolean isConnected = googleCalendarService.isUserConnected(u.userId());
             return ResponseEntity.ok(Map.of("connected", isConnected));
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
@@ -236,7 +236,7 @@ public class SyllabusController {
             if (u == null) {
                 return ResponseEntity.ok(List.of());
             }
-            List<Task> tasks = taskService.getAllTasks(u.supabaseUserId());
+            List<Task> tasks = taskService.getAllTasks(u.userId());
             return ResponseEntity.ok(convertTasksToMap(tasks));
         } catch (Exception e) {
             System.err.println("Error getting tasks: " + e.getMessage());

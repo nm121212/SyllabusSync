@@ -43,7 +43,7 @@ public class TaskService {
     @Transactional
     public List<Task> createTasksFromParsedData(String userId, List<Map<String, Object>> parsedTasks, String courseName) {
         Objects.requireNonNull(userId, "userId is required to create tasks");
-        User user = userAccountService.getOrCreateUserForSupabaseSub(userId);
+        User user = userAccountService.getOrCreateUserForGoogleSub(userId);
         String cn = (courseName != null && !courseName.isBlank()) ? courseName : "Unknown Course";
         Course course = getOrCreateCourseEntity(user, cn);
 
@@ -166,7 +166,7 @@ public class TaskService {
     @Transactional
     public Task saveTask(String userId, Task task) {
         Objects.requireNonNull(userId, "userId is required to save a task");
-        User user = userAccountService.getOrCreateUserForSupabaseSub(userId);
+        User user = userAccountService.getOrCreateUserForGoogleSub(userId);
 
         Course course;
         if (task.getCourse() != null && task.getCourse().getId() != null) {

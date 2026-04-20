@@ -21,11 +21,8 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * Supabase JWT {@code sub} — stable per sign-in identity. Used to resolve this row from API requests.
-     */
-    @Column(name = "supabase_sub", nullable = false, unique = true, length = 128)
-    private String supabaseSub;
+    @Column(name = "google_sub", nullable = false, unique = true, length = 255)
+    private String googleSub;
     
     @Size(max = 100)
     @Column(name = "first_name")
@@ -87,12 +84,12 @@ public class User {
         this.id = id;
     }
 
-    public String getSupabaseSub() {
-        return supabaseSub;
+    public String getGoogleSub() {
+        return googleSub;
     }
 
-    public void setSupabaseSub(String supabaseSub) {
-        this.supabaseSub = supabaseSub;
+    public void setGoogleSub(String googleSub) {
+        this.googleSub = googleSub;
     }
     
     public String getFirstName() {

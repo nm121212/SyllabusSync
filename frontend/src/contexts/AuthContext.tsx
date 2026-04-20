@@ -6,25 +6,25 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.ts';
 
-/**
- * Auth state for the app. Sourced from Supabase (`supabase.auth`), which is
- * the single source of truth: it does the Google OAuth dance, stores the
- * access token, refreshes it, and emits change events we subscribe to here.
- *
- * Consumers (AppShell, LandingPage, API client) read `session.access_token`
- * to authenticate calls to our Spring backend, which validates the JWT via
- * {@link com.syllabussync.security.SupabaseJwtFilter}.
- */
+const TOKEN_KEY = 'syllabussync_token';
+
+export interface AuthUser {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    full_name?: string;
+    name?: string;
+    avatar_url?: string;
+    picture?: string;
+  };
+}
+
 export interface AuthContextValue {
-  /** `true` while the initial session fetch is in flight. */
   loading: boolean;
-  /** Current Supabase session, or null when signed out. */
-  session: Session | null;
-  user: User | null;
-  /** True iff the Supabase env vars are present; used to gate UI. */
+  /** Non-null when the user is signed in. Used as a truthy "is authenticated" check. */
+  session: AuthUser | null;
+  user: AuthUser | null;
   configured: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -32,85 +32,99 @@ export interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {}
+}
+
+function clearToken(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {}
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [loading, setLoading] = useState<boolean>(true);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
-  /* Hydrate session on mount + subscribe to future changes. When the app
-     boots after a Google redirect, supabase-js reads the fragment, clears
-     it, and the `onAuthStateChange` callback fires with the new session. */
   useEffect(() => {
-    if (!supabase) {
+    // 1. Check if Google just redirected back with a token in the URL.
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    if (urlToken) {
+      storeToken(urlToken);
+      // Remove ?token= from the address bar without a page reload.
+      params.delete('token');
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+    }
+
+    // 2. Validate whichever token we now have (from URL or localStorage).
+    const token = urlToken ?? getStoredToken();
+    if (!token) {
       setLoading(false);
       return;
     }
 
-    let active = true;
-
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!active) return;
-        setSession(data.session);
-        setLoading(false);
+    fetch('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.authenticated) {
+          setUser({
+            id: data.id,
+            email: data.email,
+            user_metadata: {
+              full_name: data.name,
+              name: data.name,
+              avatar_url: data.avatar,
+              picture: data.avatar,
+            },
+          });
+        } else {
+          clearToken();
+        }
       })
       .catch(() => {
-        if (!active) return;
+        clearToken();
+      })
+      .finally(() => {
         setLoading(false);
       });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
   }, []);
 
   const signInWithGoogle = useCallback(async (): Promise<void> => {
-    if (!supabase) {
-      // eslint-disable-next-line no-alert
-      window.alert(
-        'Sign-in is not configured yet. Ask an admin to set REACT_APP_SUPABASE_URL + REACT_APP_SUPABASE_ANON_KEY.'
-      );
-      return;
-    }
-    const redirectTo = `${window.location.origin}/`;
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo,
-        // Ask Google for a refresh token so Supabase can keep the session
-        // alive without forcing the user through the consent screen again.
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
-    });
+    window.location.href = '/api/auth/google/login';
   }, []);
 
   const signOut = useCallback(async (): Promise<void> => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
+    clearToken();
+    setUser(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       loading,
-      session,
-      user: session?.user ?? null,
-      configured: isSupabaseConfigured,
+      session: user,
+      user,
+      configured: true,
       signInWithGoogle,
       signOut,
     }),
-    [loading, session, signInWithGoogle, signOut]
+    [loading, user, signInWithGoogle, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

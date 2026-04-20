@@ -50,6 +50,7 @@ google:
   client-id: ${GOOGLE_CLIENT_ID}
   client-secret: ${GOOGLE_CLIENT_SECRET}
   redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/api/syllabus/auth/google/callback}
+  auth-redirect-uri: ${GOOGLE_AUTH_REDIRECT_URI:http://localhost:8080/api/auth/google/callback}
   # Generative AI: Vertex when GOOGLE_CLOUD_PROJECT is set; else consumer Gemini API with GEMINI_API_KEY.
   # Binds to google.gemini.* / google.vertex.* (see GenerativeAiClient).
   gemini:
@@ -61,13 +62,6 @@ google:
     location: ${VERTEX_AI_LOCATION:us-central1}
     # Optional: GCP API key (Credentials → API key, restricted to Vertex AI). Uses key= on the request; no OAuth needed.
     api-key: ${VERTEX_API_KEY:${GOOGLE_API_KEY:}}
-
-# Supabase — the source of truth for user identity. The backend verifies
-# Supabase-issued JWTs using the project's JWT secret (HS256). Set
-# SUPABASE_JWT_SECRET from Supabase Dashboard → Settings → API → JWT Secret.
-supabase:
-  url: ${SUPABASE_URL:}
-  jwt-secret: ${SUPABASE_JWT_SECRET:}
 
 # JWT Configuration
 jwt:
@@ -150,10 +144,8 @@ app:
     allowed-types: pdf,docx,txt
   
   auth:
-    # When true, every request must carry a valid Supabase JWT in the
-    # Authorization header (see SupabaseJwtFilter). Production should flip
-    # this on once SUPABASE_JWT_SECRET is set.
     required: ${APP_AUTH_REQUIRED:false}
+    login-success-url: ${AUTH_LOGIN_SUCCESS_URL:http://localhost:3000}
 
   cors:
     # CSV list of allowed origins. Default "*" is convenient locally but
@@ -161,9 +153,6 @@ app:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:*}
 
   oauth:
-    # Fallback secret used to sign the Google OAuth `state` param when no
-    # Supabase JWT secret is configured (dev only). In production we reuse
-    # SUPABASE_JWT_SECRET so there's nothing extra to rotate.
     state-secret: ${APP_OAUTH_STATE_SECRET:syllabussync-local-oauth-state-secret-change-me-please-1234567890}
 
   google:
@@ -215,7 +204,7 @@ logging:
     org.springframework.web: DEBUG
 
 ---
-# Production profile (Supabase Postgres: set SPRING_DATASOURCE_* to the pooler connection string; add ?sslmode=require if required)
+# Production profile (set SPRING_DATASOURCE_* to your Postgres connection string; add ?sslmode=require if required)
 spring:
   config:
     activate:
@@ -232,7 +221,7 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
-    repair-on-migrate: true
+    validate-on-migrate: false
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
