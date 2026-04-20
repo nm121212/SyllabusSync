@@ -216,18 +216,37 @@ public class SyllabusController {
             @RequestBody Map<String, Object> updates) {
         try {
             Task updatedTask = taskService.updateTask(taskId, updates);
-            
+
+            // NOTE: `Map.of(...)` is null-hostile and was throwing NPEs for
+            // tasks without a description or a due date, which made every
+            // "mark done" click fail silently from the frontend's view.
+            // A plain HashMap accepts nulls and preserves the intent.
+            Map<String, Object> taskPayload = new HashMap<>();
+            taskPayload.put("id", updatedTask.getId());
+            taskPayload.put("title", updatedTask.getTitle());
+            taskPayload.put("description", updatedTask.getDescription());
+            // NOTE: use .name() not .toString() - these enums override
+            // toString() to return the human display name ("Completed"),
+            // which breaks the frontend's status check
+            // (`t.status === 'COMPLETED'`) and makes "mark done" look
+            // like it does nothing.
+            taskPayload.put(
+                "status",
+                updatedTask.getStatus() != null ? updatedTask.getStatus().name() : null
+            );
+            taskPayload.put(
+                "priority",
+                updatedTask.getPriority() != null ? updatedTask.getPriority().name() : null
+            );
+            taskPayload.put(
+                "dueDate",
+                updatedTask.getDueDate() != null ? updatedTask.getDueDate().toString() : null
+            );
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Task updated successfully");
-            response.put("task", Map.of(
-                "id", updatedTask.getId(),
-                "title", updatedTask.getTitle(),
-                "description", updatedTask.getDescription(),
-                "status", updatedTask.getStatus().toString(),
-                "priority", updatedTask.getPriority().toString(),
-                "dueDate", updatedTask.getDueDate().toString()
-            ));
-            
+            response.put("task", taskPayload);
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             System.err.println("Error updating task: " + e.getMessage());
@@ -395,10 +414,24 @@ public class SyllabusController {
             taskMap.put("id", task.getId());
             taskMap.put("title", task.getTitle());
             taskMap.put("description", task.getDescription());
-            taskMap.put("dueDate", task.getDueDate().toString());
-            taskMap.put("type", task.getType().toString());
-            taskMap.put("priority", task.getPriority().toString());
-            taskMap.put("status", task.getStatus().toString());
+            taskMap.put(
+                "dueDate",
+                task.getDueDate() != null ? task.getDueDate().toString() : null
+            );
+            // Use .name() for enums - the model enums override toString()
+            // to return display names ("Completed", "High", "Assignment"),
+            // but the frontend filters/labels by the canonical enum names
+            // (COMPLETED, HIGH, ASSIGNMENT). Mixing the two was why "mark
+            // done" silently rolled back in the UI.
+            taskMap.put("type", task.getType() != null ? task.getType().name() : null);
+            taskMap.put(
+                "priority",
+                task.getPriority() != null ? task.getPriority().name() : null
+            );
+            taskMap.put(
+                "status",
+                task.getStatus() != null ? task.getStatus().name() : null
+            );
             // Safely get course name
             String courseName = "Unknown Course";
             try {

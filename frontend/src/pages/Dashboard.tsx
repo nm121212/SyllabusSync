@@ -29,6 +29,7 @@ import {
   Snackbar,
   CircularProgress,
 } from '@mui/material';
+import PageHeader from '../components/PageHeader.tsx';
 import {
   Assignment,
   CheckCircle,
@@ -39,6 +40,7 @@ import {
   Sync,
   CloudSync,
 } from '@mui/icons-material';
+import { API_BASE_URL } from '../config/api.ts';
 
 interface Task {
   id: number;
@@ -53,8 +55,6 @@ interface Task {
   createdAt?: string;
   updatedAt?: string;
 }
-
-const API_BASE_URL = 'http://localhost:8080/api';
 
 const StatsCard: React.FC<{
   title: string;
@@ -376,12 +376,14 @@ const Dashboard: React.FC = () => {
   if (loading) {
     return (
       <Box>
-        <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
-          Dashboard
-        </Typography>
+        <PageHeader
+          eyebrow="Dashboard"
+          title="Your week, in rhythm"
+          subtitle="Everything on your plate - in one focused view."
+        />
         <LinearProgress />
         <Typography variant="body2" sx={{ mt: 2 }}>
-          Loading tasks...
+          Loading tasks…
         </Typography>
       </Box>
     );
@@ -390,9 +392,11 @@ const Dashboard: React.FC = () => {
   if (error) {
     return (
       <Box>
-        <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
-          Dashboard
-        </Typography>
+        <PageHeader
+          eyebrow="Dashboard"
+          title="Your week, in rhythm"
+          subtitle="Everything on your plate - in one focused view."
+        />
         <Typography color="error" sx={{ mb: 2 }}>
           Error: {error}
         </Typography>
@@ -405,18 +409,20 @@ const Dashboard: React.FC = () => {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
-        Dashboard
-      </Typography>
+      <PageHeader
+        eyebrow="Dashboard"
+        title="Your week, in rhythm"
+        subtitle="Everything on your plate this week. Mark things done, edit, and sync anything new to your calendar."
+      />
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
           <StatsCard
-            title="Total Tasks"
+            title="On your plate"
             value={stats.total}
             icon={<Assignment sx={{ fontSize: 32 }} />}
-            color="#FF6B35"
+            color="#7c6cff"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -424,23 +430,23 @@ const Dashboard: React.FC = () => {
             title="Completed"
             value={stats.completed}
             icon={<CheckCircle sx={{ fontSize: 32 }} />}
-            color="#4CAF50"
+            color="#22d3ee"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatsCard
-            title="Due This Week"
+            title="Due this week"
             value={stats.dueThisWeek}
             icon={<Schedule sx={{ fontSize: 32 }} />}
-            color="#FFB74D"
+            color="#c084fc"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatsCard
-            title="Synced to Calendar"
+            title="On your calendar"
             value={stats.synced}
             icon={<CalendarMonth sx={{ fontSize: 32 }} />}
-            color="#FF8A65"
+            color="#3b82f6"
           />
         </Grid>
       </Grid>
@@ -449,7 +455,7 @@ const Dashboard: React.FC = () => {
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2 }}>
-            Overall Progress
+            How the week is going
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <LinearProgress
@@ -468,11 +474,11 @@ const Dashboard: React.FC = () => {
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2 }}>
-            Recently Synced to Calendar
+            Just landed on your calendar
           </Typography>
           {tasks.filter(task => task.googleEventId).length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              No tasks have been synced to Google Calendar yet.
+              Nothing synced yet. Connect Google Calendar and push a task over to see it here.
             </Typography>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -501,7 +507,7 @@ const Dashboard: React.FC = () => {
                         {task.title}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {task.courseName} • Due: {task.dueDate ? new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', { 
+                        {task.courseName || 'Personal'} • Due: {task.dueDate ? new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', { 
                           year: 'numeric', 
                           month: '2-digit', 
                           day: '2-digit' 
@@ -525,7 +531,7 @@ const Dashboard: React.FC = () => {
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">Recent Tasks</Typography>
+            <Typography variant="h6">On your plate</Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               {tasks.length > 0 && (
                 <Button 
@@ -535,7 +541,7 @@ const Dashboard: React.FC = () => {
                   onClick={handleDeleteAll}
                   disabled={loading}
                 >
-                  Delete All
+                  Clear everything
                 </Button>
               )}
               {tasks.length > 0 && tasks.some(t => !t.googleEventId) && (
@@ -547,12 +553,9 @@ const Dashboard: React.FC = () => {
                   disabled={syncAllLoading || loading}
                   startIcon={syncAllLoading ? <CircularProgress size={16} /> : <Sync />}
                 >
-                  {syncAllLoading ? 'Syncing...' : 'Sync All to Calendar'}
+                  {syncAllLoading ? 'Syncing…' : 'Sync all to calendar'}
                 </Button>
               )}
-              <Button variant="outlined" size="small">
-                View All
-              </Button>
             </Box>
           </Box>
 
@@ -560,10 +563,10 @@ const Dashboard: React.FC = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Course</TableCell>
+                  <TableCell>Bucket</TableCell>
                   <TableCell>Task</TableCell>
                   <TableCell>Type</TableCell>
-                  <TableCell>Due Date</TableCell>
+                  <TableCell>Due</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Priority</TableCell>
                   <TableCell align="right">Actions</TableCell>
@@ -583,7 +586,7 @@ const Dashboard: React.FC = () => {
                     <TableRow key={task.id} hover>
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {task.courseName}
+                          {task.courseName || 'Personal'}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -765,15 +768,15 @@ const Dashboard: React.FC = () => {
 
       {/* Delete All Confirmation Dialog */}
       <Dialog open={deleteAllDialogOpen} onClose={() => setDeleteAllDialogOpen(false)}>
-        <DialogTitle>Delete All Tasks</DialogTitle>
+        <DialogTitle>Clear your plate?</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete ALL {tasks.length} tasks? This action cannot be undone and will remove all tasks from your dashboard and Google Calendar.
+            This removes all {tasks.length} task{tasks.length === 1 ? '' : 's'} from Cadence and any that are synced to Google Calendar. Can't be undone.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteAllDialogOpen(false)}>Cancel</Button>
-          <Button onClick={confirmDeleteAll} color="error" variant="contained">Delete All</Button>
+          <Button onClick={confirmDeleteAll} color="error" variant="contained">Clear everything</Button>
         </DialogActions>
       </Dialog>
 

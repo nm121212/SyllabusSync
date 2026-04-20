@@ -1,179 +1,229 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
+:root {
+  /* ── Surfaces & palette ─────────────────────────────────────────────── */
+  --ss-bg: #07060d;
+  --ss-bg-elev: #0f0d1a;
+  --ss-surface: #141127;
+  --ss-surface-2: #1a1733;
+  --ss-border: rgba(139, 92, 246, 0.18);
+  --ss-border-strong: rgba(139, 92, 246, 0.35);
+  --ss-primary: #7c6cff;
+  --ss-primary-strong: #6366f1;
+  --ss-accent: #3b82f6;
+  --ss-accent-cyan: #22d3ee;
+  --ss-danger: #f472b6;
+  --ss-success: #22d3ee;
+
+  /* ── Typography (bumped for AA contrast on dark) ────────────────────── */
+  --ss-text:      #ffffff;         /* primary */
+  --ss-text-soft: rgba(255,255,255,0.78); /* body (was .72) */
+  --ss-text-mute: rgba(255,255,255,0.62); /* secondary (was .50–.55) */
+  --ss-text-dim:  rgba(255,255,255,0.46); /* timestamps / meta */
+
+  /* ── Spacing / radii (ratios, not literals) ─────────────────────────── */
+  --ss-radius-sm: 8px;
+  --ss-radius-md: 12px;
+  --ss-radius-lg: 16px;
+  --ss-radius-xl: 20px;
+
+  /* ── Focus ring (shared across custom role=button elements) ─────────── */
+  --ss-focus-ring: 0 0 0 3px rgba(124, 108, 255, 0.5);
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Space Grotesk', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+  background: var(--ss-bg);
+  color: var(--ss-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html, body, #root {
-  height: 100%;
+code {
+  font-family: 'JetBrains Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.25);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: rgba(139, 92, 246, 0.45);
 }
 
-/* Loading animation */
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* Ambient background – faint purple vignettes on a pure dark canvas */
+.ss-app-bg {
+  position: relative;
+  min-height: 100vh;
+  background: radial-gradient(
+      1200px 600px at 85% -10%,
+      rgba(124, 108, 255, 0.18),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at -10% 110%,
+      rgba(59, 130, 246, 0.14),
+      transparent 55%
+    ),
+    var(--ss-bg);
+  /* NOTE: deliberately no `overflow: hidden` here - it would neutralise
+     `position: sticky` on the sidebar and top bar nested inside. The
+     ambient gridded ::before pseudo is already `position: fixed` so it
+     visually clips to the viewport on its own, and the body already has
+     `overflow-x: hidden` to stop horizontal bleed. */
 }
 
-.loading-spinner {
-  animation: spin 1s linear infinite;
+.ss-app-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+  z-index: 0;
 }
 
-/* Fade in animation */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
+.ss-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* The top bar is sticky (~64px tall). Offset any anchor target so a
+   `scrollIntoView` from the sidebar doesn't land under it. */
+section[id] {
+  scroll-margin-top: 80px;
+}
+
+/* ── Accessibility: shared focus ring for non-MUI interactive elements ─
+   Custom `role="button"` divs (feature cards, suggestion chips, filter
+   pills) historically had no visible focus state. This uses :focus-visible
+   so mouse users don't see an outline on click, but keyboard users do. */
+:where(
+  [role='button'],
+  [role='link'],
+  [role='tab'],
+  a,
+  button,
+  input,
+  select,
+  textarea
+):focus-visible {
+  outline: none;
+  box-shadow: var(--ss-focus-ring);
+  border-radius: inherit;
+}
+
+/* Keep MUI's native focus styles on inputs (don't stack two rings). */
+.MuiOutlinedInput-root:focus-visible,
+.MuiButtonBase-root:focus-visible {
+  box-shadow: none;
+}
+
+/* Honour users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Animations */
+@keyframes ss-float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(1.5deg); }
+}
+
+@keyframes ss-float-slow {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-20px) rotate(-2deg); }
+}
+
+@keyframes ss-fade-up {
+  from { opacity: 0; transform: translateY(24px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.fade-in {
-  animation: fadeIn 0.3s ease-out;
+@keyframes ss-pulse-glow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
 }
 
-/* Pulse animation for notifications */
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+@keyframes ss-spin {
+  to { transform: rotate(360deg); }
 }
 
-.pulse {
-  animation: pulse 2s infinite;
+.ss-fade-up {
+  animation: ss-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Utility classes */
-.text-center {
-  text-align: center;
+.loading-spinner {
+  animation: ss-spin 1s linear infinite;
 }
 
-.text-left {
-  text-align: left;
+/* Shared gradient text utility */
+.ss-gradient-text {
+  background: linear-gradient(135deg, #ffffff 0%, #c7b9ff 45%, #7c6cff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
-.text-right {
-  text-align: right;
+.ss-gradient-text-blue {
+  background: linear-gradient(135deg, #8ab4ff 0%, #7c6cff 60%, #c084fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
-.mb-1 { margin-bottom: 8px; }
-.mb-2 { margin-bottom: 16px; }
-.mb-3 { margin-bottom: 24px; }
-.mb-4 { margin-bottom: 32px; }
-
-.mt-1 { margin-top: 8px; }
-.mt-2 { margin-top: 16px; }
-.mt-3 { margin-top: 24px; }
-.mt-4 { margin-top: 32px; }
-
-.p-1 { padding: 8px; }
-.p-2 { padding: 16px; }
-.p-3 { padding: 24px; }
-.p-4 { padding: 32px; }
-
-/* Status colors */
-.status-pending {
-  color: #ff9800;
+/* Pill / chip helpers */
+.ss-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ss-border-strong);
+  background: rgba(124, 108, 255, 0.08);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ss-text-soft);
 }
 
-.status-in-progress {
-  color: #2196f3;
-}
-
-.status-completed {
-  color: #4caf50;
-}
-
-.status-cancelled {
-  color: #f44336;
-}
-
-/* Priority colors */
-.priority-low {
-  color: #4caf50;
-}
-
-.priority-medium {
-  color: #ff9800;
-}
-
-.priority-high {
-  color: #ff5722;
-}
-
-.priority-urgent {
-  color: #f44336;
-}
-
-/* Task type icons */
-.task-assignment::before {
-  content: "📝";
-  margin-right: 8px;
-}
-
-.task-project::before {
-  content: "📋";
-  margin-right: 8px;
-}
-
-.task-exam::before {
-  content: "📚";
-  margin-right: 8px;
-}
-
-.task-quiz::before {
-  content: "❓";
-  margin-right: 8px;
-}
-
-.task-lab::before {
-  content: "🧪";
-  margin-right: 8px;
-}
-
-.task-presentation::before {
-  content: "🎤";
-  margin-right: 8px;
-}
-
-.task-paper::before {
-  content: "📄";
-  margin-right: 8px;
-}
-
-.task-discussion::before {
-  content: "💬";
-  margin-right: 8px;
-}
-
-.task-other::before {
-  content: "📌";
-  margin-right: 8px;
+.ss-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ss-primary);
+  box-shadow: 0 0 10px var(--ss-primary);
+  animation: ss-pulse-glow 2.2s ease-in-out infinite;
+  /* Decorative. Matches the `aria-hidden` we set on consumers. */
 }

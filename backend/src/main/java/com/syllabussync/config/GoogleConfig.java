@@ -32,7 +32,7 @@ public class GoogleConfig {
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
 
     /**
-     * Explicit URLs — Events.Insert needs calendar write access (not calendar.readonly).
+     * Explicit URLs - Events.Insert needs calendar write access (not calendar.readonly).
      * Must match scopes added under OAuth consent screen → Data access / Scopes in Google Cloud Console.
      */
     private static final List<String> SCOPES = Arrays.asList(

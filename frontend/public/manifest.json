@@ -1,6 +1,6 @@
 {
-  "short_name": "SyllabusSync",
-  "name": "SyllabusSync - Academic Task Management",
+  "short_name": "Cadence",
+  "name": "Cadence — Your day, in rhythm",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,7 +20,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#1976d2",
-  "background_color": "#ffffff",
-  "description": "Intelligent academic task management system that automatically extracts deadlines and deliverables from course syllabi and syncs them with Google Calendar."
+  "theme_color": "#07060d",
+  "background_color": "#07060d",
+  "description": "The AI chatbot that plans your day. Chat, capture, and land everything on your calendar."
 }

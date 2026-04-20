@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useUpload } from '../contexts/UploadContext.tsx';
+import { useTasks } from '../contexts/TasksContext.tsx';
 import {
   Box,
   Typography,
@@ -20,16 +21,16 @@ import {
   TableRow,
   Chip,
   Paper,
-  IconButton,
 } from '@mui/material';
 import {
   CloudUpload,
   CheckCircle,
-  Edit,
-  Delete,
-  CalendarMonth,
   Sync,
+  ArrowBack,
+  FiberManualRecord,
 } from '@mui/icons-material';
+import PageHeader from '../components/PageHeader.tsx';
+import { API_BASE_URL } from '../config/api.ts';
 
 interface Task {
   id: string;
@@ -47,10 +48,52 @@ interface ParseResult {
   tasks: Task[];
 }
 
-const steps = ['Upload Syllabus', 'Review Tasks', 'Confirm & Save'];
+/**
+ * Simpler capture flow - was previously a 3-step wizard with a fake
+ * "confirm" step (tasks were actually saved at upload, but the UI lied
+ * and showed another loading state), plus Edit/Delete icons on the
+ * review table that had no handlers. Both removed. The real flow is
+ * now just two honest steps:
+ *   1. Drop the file - we parse + save it
+ *   2. Review what we found - optionally push everything to Google
+ */
+const steps = ['Drop a doc', 'Review what we found'];
 
-const UploadSyllabus: React.FC = () => {
+interface UploadSyllabusProps {
+  /** When true, suppress the built-in <PageHeader> so the component can be
+   *  embedded inside another section (e.g. the landing page) that supplies
+   *  its own heading. */
+  embedded?: boolean;
+}
+
+const priorityTone = (priority: string): 'error' | 'warning' | 'info' | 'default' => {
+  switch (priority) {
+    case 'URGENT':
+      return 'error';
+    case 'HIGH':
+      return 'warning';
+    case 'MEDIUM':
+      return 'info';
+    default:
+      return 'default';
+  }
+};
+
+const formatDueDate = (iso: string): string => {
+  if (!iso) return 'No date';
+  const d = new Date(iso + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+const UploadSyllabus: React.FC<UploadSyllabusProps> = ({ embedded = false }) => {
   const { startUpload, updateUploadProgress, updateUploadStatus } = useUpload();
+  const { bumpVersion } = useTasks();
+
   const [activeStep, setActiveStep] = useState(0);
   const [file, setFile] = useState<File | null>(null);
   const [courseName, setCourseName] = useState('');
@@ -71,9 +114,7 @@ const UploadSyllabus: React.FC = () => {
     e.preventDefault();
     setDragOver(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) {
-      handleFileSelect(droppedFile);
-    }
+    if (droppedFile) handleFileSelect(droppedFile);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -81,40 +122,29 @@ const UploadSyllabus: React.FC = () => {
     setDragOver(true);
   };
 
-  const handleDragLeave = () => {
-    setDragOver(false);
-  };
+  const handleDragLeave = () => setDragOver(false);
 
   const handleUpload = async () => {
     if (!file) {
-      setError('Please select a file');
+      setError('Please pick a file first.');
       return;
     }
-
     setLoading(true);
     setError(null);
 
-    // Start tracking upload in global context
     const uploadId = startUpload(file.name);
-
     const formData = new FormData();
     formData.append('file', file);
-    if (courseName) {
-      formData.append('courseName', courseName);
-    }
+    if (courseName) formData.append('courseName', courseName);
 
     try {
-      // Simulate upload progress
       updateUploadProgress(uploadId, 25);
-      
-      const response = await fetch('/api/syllabus/upload', {
+      const response = await fetch(`${API_BASE_URL}/syllabus/upload`, {
         method: 'POST',
         body: formData,
       });
-
       updateUploadProgress(uploadId, 75);
       updateUploadStatus(uploadId, 'parsing');
-
       const data = await response.json();
 
       if (response.ok) {
@@ -122,26 +152,18 @@ const UploadSyllabus: React.FC = () => {
         updateUploadStatus(uploadId, 'completed', data);
         setParseResult(data);
         setActiveStep(1);
+        /* Tasks are persisted by the upload endpoint - let other panels
+           (TasksSection, TaskCalendar, hero stats) refetch. */
+        bumpVersion();
       } else {
         updateUploadStatus(uploadId, 'error', null, data.error || 'Upload failed');
-        setError(data.error || 'Upload failed');
+        setError(data.error || 'We couldn\u2019t read that file. Try another.');
       }
-    } catch (err) {
+    } catch {
       updateUploadStatus(uploadId, 'error', null, 'Network error occurred');
-      setError('Network error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConfirm = async () => {
-    setLoading(true);
-    try {
-      // Mock save operation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setActiveStep(2);
-    } catch (err) {
-      setError('Failed to save tasks');
+      setError(
+        'Network error - check that the backend is running, then try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -151,72 +173,69 @@ const UploadSyllabus: React.FC = () => {
     setSyncLoading(true);
     setSyncError(null);
     setSyncSuccess(false);
-    
     try {
-      const API_BASE_URL = 'http://localhost:8080/api';
-      
-      // Get all tasks
       const tasksResponse = await fetch(`${API_BASE_URL}/syllabus/tasks`);
       const tasks = await tasksResponse.json();
-      
-      if (tasks.length === 0) {
-        setSyncError('No tasks found to sync');
+
+      if (!Array.isArray(tasks) || tasks.length === 0) {
+        setSyncError('No tasks to sync yet.');
         return;
       }
-      
-      // Group tasks by course
+
+      // Group by course so we use the existing per-course sync endpoint.
       const tasksByCourse = tasks.reduce((acc: any, task: any) => {
-        const courseName = task.courseName || 'Unknown Course';
-        if (!acc[courseName]) {
-          acc[courseName] = [];
-        }
-        acc[courseName].push(task);
+        const key = task.courseName || 'Personal';
+        (acc[key] ||= []).push(task);
         return acc;
       }, {});
-      
-      // Sync each course's tasks
-      for (const [courseName, courseTasks] of Object.entries(tasksByCourse)) {
-        const syncResponse = await fetch(`${API_BASE_URL}/syllabus/generate-calendar`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            tasks: courseTasks,
-            courseName: courseName,
-          }),
-        });
-        
+
+      for (const [bucket, bucketTasks] of Object.entries(tasksByCourse)) {
+        const syncResponse = await fetch(
+          `${API_BASE_URL}/syllabus/generate-calendar`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasks: bucketTasks, courseName: bucket }),
+          }
+        );
         if (!syncResponse.ok) {
-          const errorData = await syncResponse.json();
-          throw new (Error as any)((errorData as any).error || 'Failed to sync tasks');
+          const errorData = await syncResponse.json().catch(() => ({}));
+          throw new Error(
+            (errorData as any)?.error ||
+              'Sync failed. Make sure Google Calendar is connected in Settings.'
+          );
         }
       }
-      
       setSyncSuccess(true);
-      setSyncError(null);
+      bumpVersion();
     } catch (err) {
-      setSyncError(err instanceof Error ? (err as Error).message : 'Failed to sync tasks');
+      setSyncError(
+        err instanceof Error ? err.message : 'Could not sync to Google Calendar.'
+      );
     } finally {
       setSyncLoading(false);
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'URGENT': return 'error';
-      case 'HIGH': return 'warning';
-      case 'MEDIUM': return 'info';
-      case 'LOW': return 'success';
-      default: return 'default';
-    }
+  const resetFlow = () => {
+    setActiveStep(0);
+    setFile(null);
+    setCourseName('');
+    setParseResult(null);
+    setSyncError(null);
+    setSyncSuccess(false);
+    setError(null);
   };
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
-        Upload Syllabus
-      </Typography>
+      {!embedded && (
+        <PageHeader
+          eyebrow="Capture"
+          title="Turn any document into a plan"
+          subtitle="Drop a PDF, DOCX, or TXT - meeting notes, a brief, an itinerary, a syllabus. Cadence extracts every date and action item so you can review and drop it straight onto your day."
+        />
+      )}
 
       <Card sx={{ mb: 4 }}>
         <CardContent>
@@ -231,16 +250,17 @@ const UploadSyllabus: React.FC = () => {
           {activeStep === 0 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 3 }}>
-                Step 1: Upload Your Syllabus
+                Step 1 &middot; Drop your document
               </Typography>
 
               <TextField
                 fullWidth
-                label="Course Name"
+                label="Bucket (optional)"
                 value={courseName}
                 onChange={(e) => setCourseName(e.target.value)}
                 sx={{ mb: 3 }}
-                placeholder="e.g., CS 3510 - Design and Analysis of Algorithms"
+                helperText="Group these tasks - e.g. Work, Personal, Trip to Tokyo, CS 3510."
+                placeholder="Work · Q2 kickoff"
               />
 
               <Box
@@ -249,11 +269,15 @@ const UploadSyllabus: React.FC = () => {
                 onDragLeave={handleDragLeave}
                 sx={{
                   border: '2px dashed',
-                  borderColor: dragOver ? 'primary.main' : 'grey.300',
-                  borderRadius: 2,
-                  p: 4,
+                  borderColor: dragOver
+                    ? 'primary.main'
+                    : 'rgba(139, 92, 246, 0.35)',
+                  borderRadius: 3,
+                  p: 5,
                   textAlign: 'center',
-                  bgcolor: dragOver ? 'primary.light' : 'grey.50',
+                  background: dragOver
+                    ? 'rgba(124, 108, 255, 0.12)'
+                    : 'rgba(10, 9, 20, 0.5)',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   mb: 3,
@@ -269,26 +293,50 @@ const UploadSyllabus: React.FC = () => {
                     if (selectedFile) handleFileSelect(selectedFile);
                   }}
                 />
-                <label htmlFor="file-upload" style={{ cursor: 'pointer', width: '100%', display: 'block' }}>
-                  <CloudUpload sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
+                <label
+                  htmlFor="file-upload"
+                  style={{ cursor: 'pointer', width: '100%', display: 'block' }}
+                >
+                  <CloudUpload
+                    sx={{ fontSize: 48, color: 'primary.light', mb: 2 }}
+                  />
                   <Typography variant="h6" sx={{ mb: 1 }}>
-                    {file ? file.name : 'Drop your syllabus here or click to browse'}
+                    {file
+                      ? file.name
+                      : 'Drop your document here or click to browse'}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Supports PDF, DOCX, and TXT files (max 10MB)
+                  <Typography variant="body2" sx={{ color: 'var(--ss-text-mute)' }}>
+                    PDF, DOCX or TXT &middot; up to 10&nbsp;MB
                   </Typography>
                 </label>
               </Box>
 
-              <Button
-                variant="contained"
-                onClick={handleUpload}
-                disabled={!file || loading}
-                startIcon={loading ? <CircularProgress size={20} /> : <CloudUpload />}
-                size="large"
-              >
-                {loading ? 'Processing...' : 'Upload & Parse Syllabus'}
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  onClick={handleUpload}
+                  disabled={!file || loading}
+                  startIcon={
+                    loading ? (
+                      <CircularProgress size={18} sx={{ color: '#fff' }} />
+                    ) : (
+                      <CloudUpload />
+                    )
+                  }
+                  size="large"
+                >
+                  {loading ? 'Reading your doc\u2026' : 'Extract tasks'}
+                </Button>
+                {file && !loading && (
+                  <Button
+                    variant="text"
+                    onClick={() => setFile(null)}
+                    sx={{ color: 'var(--ss-text-mute)' }}
+                  >
+                    Remove file
+                  </Button>
+                )}
+              </Box>
 
               {error && (
                 <Alert severity="error" sx={{ mt: 2 }}>
@@ -300,62 +348,90 @@ const UploadSyllabus: React.FC = () => {
 
           {activeStep === 1 && parseResult && (
             <Box>
-              <Typography variant="h6" sx={{ mb: 3 }}>
-                Step 2: Review Extracted Tasks
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Step 2 &middot; Review what we found
               </Typography>
 
-              <Alert severity="success" sx={{ mb: 3 }}>
-                Successfully extracted {parseResult.tasksFound} tasks from {parseResult.fileName}
+              <Alert
+                severity="success"
+                icon={<CheckCircle fontSize="inherit" />}
+                sx={{ mb: 3 }}
+              >
+                Pulled {parseResult.tasksFound} task
+                {parseResult.tasksFound === 1 ? '' : 's'} out of{' '}
+                <strong>{parseResult.fileName}</strong>. They&rsquo;re already
+                on your plate - tweak or delete individual ones from the Tasks
+                section.
               </Alert>
 
+              {syncError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {syncError}
+                </Alert>
+              )}
+              {syncSuccess && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Everything pushed to Google Calendar.
+                </Alert>
+              )}
+
               <TableContainer component={Paper} elevation={0} sx={{ mb: 3 }}>
-                <Table>
+                <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Task</TableCell>
                       <TableCell>Type</TableCell>
-                      <TableCell>Due Date</TableCell>
+                      <TableCell>Due</TableCell>
                       <TableCell>Priority</TableCell>
-                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {parseResult.tasks.map((task, index) => (
                       <TableRow key={index}>
                         <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {task.title}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {task.description}
-                          </Typography>
+                          {task.description && (
+                            <Typography
+                              variant="caption"
+                              sx={{ color: 'var(--ss-text-mute)' }}
+                            >
+                              {task.description}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Chip label={task.type} size="small" variant="outlined" />
+                          <Chip
+                            label={task.type}
+                            size="small"
+                            variant="outlined"
+                          />
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">
-                            {task.dueDate ? new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', { 
-                              year: 'numeric', 
-                              month: '2-digit', 
-                              day: '2-digit' 
-                            }).replace(/\//g, '-') : 'No date'}
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 0.75,
+                            }}
+                          >
+                            {task.dueDate && (
+                              <FiberManualRecord
+                                aria-hidden
+                                sx={{ fontSize: 8, color: 'primary.light' }}
+                              />
+                            )}
+                            {formatDueDate(task.dueDate)}
                           </Typography>
                         </TableCell>
                         <TableCell>
                           <Chip
                             label={task.priority}
                             size="small"
-                            color={getPriorityColor(task.priority) as any}
+                            color={priorityTone(task.priority)}
                           />
-                        </TableCell>
-                        <TableCell align="right">
-                          <IconButton size="small" color="primary">
-                            <Edit fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" color="error">
-                            <Delete fontSize="small" />
-                          </IconButton>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -363,68 +439,31 @@ const UploadSyllabus: React.FC = () => {
                 </Table>
               </TableContainer>
 
-              <Box sx={{ display: 'flex', gap: 2 }}>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                 <Button
                   variant="outlined"
-                  onClick={() => setActiveStep(0)}
+                  startIcon={<ArrowBack />}
+                  onClick={resetFlow}
                 >
-                  Back
+                  Drop another doc
                 </Button>
                 <Button
                   variant="contained"
-                  onClick={handleConfirm}
-                  disabled={loading}
-                  startIcon={loading ? <CircularProgress size={20} /> : <CheckCircle />}
-                >
-                  {loading ? 'Saving...' : 'Confirm & Save Tasks'}
-                </Button>
-              </Box>
-            </Box>
-          )}
-
-          {activeStep === 2 && (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <CheckCircle sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
-                Tasks Saved Successfully!
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-                {parseResult?.tasksFound} tasks have been added to your dashboard.
-              </Typography>
-              
-              {syncError && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {syncError}
-                </Alert>
-              )}
-              
-              {syncSuccess && (
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  Tasks synced to Google Calendar successfully!
-                </Alert>
-              )}
-
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setActiveStep(0);
-                    setFile(null);
-                    setCourseName('');
-                    setParseResult(null);
-                    setSyncError(null);
-                    setSyncSuccess(false);
-                  }}
-                >
-                  Upload Another Syllabus
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={syncLoading ? <CircularProgress size={20} /> : <Sync />}
+                  startIcon={
+                    syncLoading ? (
+                      <CircularProgress size={18} sx={{ color: '#fff' }} />
+                    ) : (
+                      <Sync />
+                    )
+                  }
                   onClick={handleSyncToCalendar}
                   disabled={syncLoading}
                 >
-                  {syncLoading ? 'Syncing...' : 'Sync to Calendar'}
+                  {syncLoading
+                    ? 'Syncing\u2026'
+                    : syncSuccess
+                      ? 'Synced \u2714'
+                      : 'Push all to Google Calendar'}
                 </Button>
               </Box>
             </Box>
