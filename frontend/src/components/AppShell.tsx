@@ -45,11 +45,19 @@ type NavItem = {
   icon: React.ReactNode;
 };
 
+/** Sections we observe for scroll-spy (nav labels are separate from this list). */
+const SCROLL_SPY_IDS = [
+  'today',
+  'features',
+  'chat',
+  'tasks',
+  'calendar',
+  'capture',
+];
+
 const primaryNav: NavItem[] = [
   { label: 'Today', to: '/#today', icon: <HomeOutlined /> },
-  { label: 'Chat', to: '/#chat', icon: <PulseChatIcon sx={{ fontSize: 22 }} /> },
-  { label: 'Tasks', to: '/#tasks', icon: <TaskAltOutlined /> },
-  { label: 'Calendar', to: '/#calendar', icon: <CalendarMonth /> },
+  { label: 'Chat', to: '/#chat', icon: <PulseChatIcon size={22} /> },
   { label: 'Capture', to: '/#capture', icon: <CloudUploadOutlined /> },
 ];
 
@@ -223,13 +231,148 @@ const NavButton: React.FC<{
   );
 };
 
+/** Tasks + Calendar grouped in one bordered block (scroll to #tasks / #calendar). */
+const PlanNavGroup: React.FC<{
+  collapsed: boolean;
+  activeHash: string;
+  onHashNavigate: (hash: string) => void;
+}> = ({ collapsed, activeHash, onHashNavigate }) => {
+  const tasksActive = activeHash === 'tasks';
+  const calActive = activeHash === 'calendar';
+
+  const subRow = (
+    label: string,
+    hash: string,
+    icon: React.ReactNode,
+    active: boolean
+  ) => (
+    <Box
+      key={hash}
+      onClick={() => onHashNavigate(hash)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => (e.key === 'Enter' ? onHashNavigate(hash) : undefined)}
+      sx={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        px: collapsed ? 1.25 : 1.5,
+        py: 0.85,
+        borderRadius: 2,
+        cursor: 'pointer',
+        color: active ? '#fff' : 'rgba(255,255,255,0.68)',
+        background: active
+          ? 'linear-gradient(90deg, rgba(124,108,255,0.22), rgba(124,108,255,0.06))'
+          : 'transparent',
+        border: active
+          ? '1px solid rgba(139,92,246,0.4)'
+          : '1px solid transparent',
+        transition: 'all 180ms ease',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        '&:hover': {
+          color: '#fff',
+          background: 'rgba(124,108,255,0.1)',
+          borderColor: 'rgba(139,92,246,0.25)',
+        },
+      }}
+    >
+      <Box
+        sx={{
+          width: 22,
+          height: 22,
+          display: 'grid',
+          placeItems: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </Box>
+      {!collapsed && (
+        <Typography
+          sx={{
+            fontSize: 13,
+            fontWeight: active ? 600 : 500,
+            letterSpacing: '-0.005em',
+          }}
+        >
+          {label}
+        </Typography>
+      )}
+    </Box>
+  );
+
+  const groupInner = (
+    <Box
+      sx={{
+        borderRadius: 2.5,
+        border: '1px solid rgba(139, 92, 246, 0.28)',
+        background: 'rgba(124, 108, 255, 0.05)',
+        p: collapsed ? 0.35 : 0.5,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.35,
+      }}
+    >
+      {subRow('Tasks', 'tasks', <TaskAltOutlined sx={{ fontSize: 20 }} />, tasksActive)}
+      {subRow(
+        'Calendar',
+        'calendar',
+        <CalendarMonth sx={{ fontSize: 20 }} />,
+        calActive
+      )}
+    </Box>
+  );
+
+  if (collapsed) {
+    return (
+      <Tooltip title="Tasks & calendar" placement="right">
+        <Box
+          onClick={() => onHashNavigate('tasks')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) =>
+            e.key === 'Enter' ? onHashNavigate('tasks') : undefined
+          }
+          sx={{
+            borderRadius: 2.5,
+            border: '1px solid rgba(139, 92, 246, 0.28)',
+            background: 'rgba(124, 108, 255, 0.05)',
+            py: 0.75,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            cursor: 'pointer',
+            '&:hover': { background: 'rgba(124, 108, 255, 0.12)' },
+          }}
+        >
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateRows: '11px 11px',
+              gap: '3px',
+              justifyItems: 'center',
+            }}
+          >
+            <TaskAltOutlined sx={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} />
+            <CalendarMonth sx={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} />
+          </Box>
+        </Box>
+      </Tooltip>
+    );
+  }
+
+  return groupInner;
+};
+
 /* ──────────────────────────────────────────────────────────────────────── */
 const Sidebar: React.FC<{
   collapsed: boolean;
   activeHash: string;
   onNavigate: (item: NavItem) => void;
+  onHashNavigate: (hash: string) => void;
   currentPath: string;
-}> = ({ collapsed, activeHash, onNavigate, currentPath }) => (
+}> = ({ collapsed, activeHash, onNavigate, onHashNavigate, currentPath }) => (
   <Box
     sx={{
       width: collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH,
@@ -251,7 +394,26 @@ const Sidebar: React.FC<{
     </Box>
 
     <Box sx={{ px: 1.25, mt: 1, display: 'grid', gap: 0.5 }}>
-      {primaryNav.map((item) => {
+      {primaryNav.slice(0, 2).map((item) => {
+        const hash = item.to.startsWith('/#') ? item.to.slice(2) : '';
+        const active =
+          currentPath === '/' ? activeHash === hash : currentPath === item.to;
+        return (
+          <NavButton
+            key={item.to}
+            item={item}
+            active={active}
+            collapsed={collapsed}
+            onClick={() => onNavigate(item)}
+          />
+        );
+      })}
+      <PlanNavGroup
+        collapsed={collapsed}
+        activeHash={activeHash}
+        onHashNavigate={onHashNavigate}
+      />
+      {primaryNav.slice(2).map((item) => {
         const hash = item.to.startsWith('/#') ? item.to.slice(2) : '';
         const active =
           currentPath === '/' ? activeHash === hash : currentPath === item.to;
@@ -540,15 +702,33 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeHash, setActiveHash] = useState<string>('today');
 
+  const goToHash = React.useCallback(
+    (hash: string) => {
+      setMobileOpen(false);
+      if (location.pathname !== '/') {
+        navigate('/');
+        window.setTimeout(() => {
+          window.history.replaceState({}, '', `/#${hash}`);
+          document
+            .getElementById(hash)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
+      } else {
+        window.history.replaceState({}, '', `/#${hash}`);
+        document
+          .getElementById(hash)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    },
+    [location.pathname, navigate]
+  );
+
   /* Track which landing section is in view so the sidebar highlights it. */
   useEffect(() => {
     if (location.pathname !== '/') return;
-    const ids = primaryNav
-      .filter((n) => n.to.startsWith('/#'))
-      .map((n) => n.to.slice(2));
-    const elements = ids
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => el !== null);
+    const elements = SCROLL_SPY_IDS.map((id) => document.getElementById(id)).filter(
+      (el): el is HTMLElement => el !== null
+    );
     if (elements.length === 0) return;
 
     const observer = new IntersectionObserver(
@@ -631,6 +811,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           collapsed={false}
           activeHash={activeHash}
           onNavigate={handleNavigate}
+          onHashNavigate={goToHash}
           currentPath={location.pathname}
         />
       </Box>
@@ -666,7 +847,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </IconButton>
         </Box>
         <Box sx={{ px: 1.25, display: 'grid', gap: 0.5 }}>
-          {[...primaryNav, ...secondaryNav].map((item) => {
+          {primaryNav.slice(0, 2).map((item) => {
             const hash = item.to.startsWith('/#') ? item.to.slice(2) : '';
             const active =
               location.pathname === '/'
@@ -677,6 +858,40 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 key={item.to}
                 item={item}
                 active={active}
+                collapsed={false}
+                onClick={() => handleNavigate(item)}
+              />
+            );
+          })}
+          <PlanNavGroup
+            collapsed={false}
+            activeHash={activeHash}
+            onHashNavigate={goToHash}
+          />
+          {primaryNav.slice(2).map((item) => {
+            const hash = item.to.startsWith('/#') ? item.to.slice(2) : '';
+            const active =
+              location.pathname === '/'
+                ? activeHash === hash
+                : location.pathname === item.to;
+            return (
+              <NavButton
+                key={item.to}
+                item={item}
+                active={active}
+                collapsed={false}
+                onClick={() => handleNavigate(item)}
+              />
+            );
+          })}
+          {secondaryNav.map((item) => {
+            const active = location.pathname === item.to;
+            return (
+              <NavButton
+                key={item.to}
+                item={item}
+                active={active}
+                collapsed={false}
                 onClick={() => handleNavigate(item)}
               />
             );

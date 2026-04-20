@@ -1,13 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  Container,
-  Divider,
-  Grid,
-  Typography,
-} from '@mui/material';
+import { Box, Button, Container, Grid, Typography } from '@mui/material';
 import {
   CalendarMonth,
   SmartToy,
@@ -664,9 +657,7 @@ const LandingPage: React.FC = () => {
                   boxShadow: '0 20px 40px -24px rgba(124,108,255,0.5)',
                 }}
               >
-                <PulseChatIcon
-                  sx={{ fontSize: 22, flexShrink: 0 }}
-                />
+                <PulseChatIcon size={22} sx={{ flexShrink: 0 }} />
                 <Box
                   component="input"
                   value={heroInput}
@@ -1084,7 +1075,7 @@ const LandingPage: React.FC = () => {
                 Plan and execute <br /> in one view.
               </>
             }
-            subtitle="Full month in the center; your list and a quick month view stay together in the sidebar."
+            subtitle="Full month beside your task list—one calendar, drag tasks onto days to reschedule."
           />
           <Box sx={{ mt: { xs: 4, md: 6 } }}>
             <Card sx={{ overflow: 'hidden' }}>
@@ -1109,7 +1100,8 @@ const LandingPage: React.FC = () => {
                     <CardHeader>
                       <CardTitle>Your month</CardTitle>
                       <CardDescription>
-                        Drag a task from the sidebar onto any day to reschedule.
+                        Drag a task from the list on the right onto any day to
+                        reschedule.
                       </CardDescription>
                     </CardHeader>
                     <CardContent sx={{ pt: 0 }}>
@@ -1127,7 +1119,7 @@ const LandingPage: React.FC = () => {
                   </Box>
                 </Grid>
 
-                {/* Sidebar: tasks + compact calendar together */}
+                {/* Sidebar: tasks only (single calendar lives in the main column) */}
                 <Grid item xs={12} lg={4}>
                   <Box
                     sx={{
@@ -1138,9 +1130,10 @@ const LandingPage: React.FC = () => {
                     }}
                   >
                     <CardHeader sx={{ pb: 0 }}>
-                      <CardTitle>On your plate</CardTitle>
+                      <CardTitle>My tasks</CardTitle>
                       <CardDescription>
-                        Your task list and a compact month view in one column.
+                        Quick edits, completion, and Google sync—grab the grip
+                        to drag onto the calendar.
                       </CardDescription>
                     </CardHeader>
                     <CardContent
@@ -1149,50 +1142,11 @@ const LandingPage: React.FC = () => {
                         pb: 1,
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 0,
                         flex: 1,
                         minHeight: 0,
                       }}
                     >
-                      <Typography
-                        variant="overline"
-                        sx={{
-                          letterSpacing: '0.14em',
-                          fontSize: 10,
-                          color: 'var(--ss-text-mute)',
-                          mb: 0.5,
-                        }}
-                      >
-                        My tasks
-                      </Typography>
                       <TasksSection embedded />
-                      <Divider
-                        sx={{
-                          my: 2,
-                          borderColor: 'rgba(139, 92, 246, 0.14)',
-                        }}
-                      />
-                      <Typography
-                        variant="overline"
-                        sx={{
-                          letterSpacing: '0.14em',
-                          fontSize: 10,
-                          color: 'var(--ss-text-mute)',
-                          mb: 1,
-                        }}
-                      >
-                        Month at a glance
-                      </Typography>
-                      <TaskCalendar
-                        tasks={(stats.tasks ?? []) as CalendarTask[]}
-                        variant="compact"
-                        framed={false}
-                        onTaskClick={(t) => {
-                          const e = calendarTaskToEditable(t);
-                          if (e) setCalendarEditTask(e);
-                        }}
-                        onTaskDroppedOnDay={rescheduleTaskToDay}
-                      />
                     </CardContent>
                   </Box>
                 </Grid>
