@@ -32,6 +32,7 @@ public class Task {
     
     @NotNull
     @Enumerated(EnumType.STRING)
+    @Column(name = "task_type")
     private TaskType type;
     
     @NotNull

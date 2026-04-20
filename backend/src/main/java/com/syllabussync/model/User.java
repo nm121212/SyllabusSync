@@ -2,7 +2,6 @@ package com.syllabussync.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -21,18 +20,21 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /**
+     * Supabase JWT {@code sub} — stable per sign-in identity. Used to resolve this row from API requests.
+     */
+    @Column(name = "supabase_sub", nullable = false, unique = true, length = 128)
+    private String supabaseSub;
     
-    @NotBlank
     @Size(max = 100)
     @Column(name = "first_name")
     private String firstName;
     
-    @NotBlank
     @Size(max = 100)
     @Column(name = "last_name")
     private String lastName;
     
-    @NotBlank
     @Email
     @Size(max = 255)
     @Column(unique = true)
@@ -83,6 +85,14 @@ public class User {
     
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getSupabaseSub() {
+        return supabaseSub;
+    }
+
+    public void setSupabaseSub(String supabaseSub) {
+        this.supabaseSub = supabaseSub;
     }
     
     public String getFirstName() {
@@ -183,7 +193,9 @@ public class User {
     
     // Helper methods
     public String getFullName() {
-        return firstName + " " + lastName;
+        String fn = firstName != null ? firstName : "";
+        String ln = lastName != null ? lastName : "";
+        return (fn + " " + ln).trim();
     }
     
     public void addCourse(Course course) {
