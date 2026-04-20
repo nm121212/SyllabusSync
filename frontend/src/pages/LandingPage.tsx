@@ -10,6 +10,7 @@ import {
   InsertDriveFileOutlined,
 } from '@mui/icons-material';
 import TaskCalendar, { CalendarTask } from '../components/TaskCalendar.tsx';
+import ChatPanel, { ChatMessage } from '../components/ChatPanel.tsx';
 import TasksSection from '../components/TasksSection.tsx';
 import {
   Card,
@@ -20,7 +21,6 @@ import {
 } from '../components/ui/card.tsx';
 import UploadSyllabus from './UploadSyllabus.tsx';
 import { useTasks } from '../contexts/TasksContext.tsx';
-import { useFloatingChat } from '../contexts/FloatingChatContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import GoogleSignInButton from '../components/GoogleSignInButton.tsx';
@@ -467,7 +467,6 @@ const calendarTaskToEditable = (t: CalendarTask): EditableTask | null => {
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { version, bumpVersion } = useTasks();
-  const { setPendingPrompt, openDock } = useFloatingChat();
   const stats = useLiveStats(version);
   const { session } = useAuth();
   const [calendarEditTask, setCalendarEditTask] = useState<EditableTask | null>(
@@ -479,14 +478,31 @@ const LandingPage: React.FC = () => {
   };
 
   const [heroInput, setHeroInput] = useState('');
+  const [pendingPrompt, setPendingPrompt] = useState<
+    { text: string; id: string } | undefined
+  >(undefined);
 
   const submitHero = (raw?: string) => {
     const text = (raw ?? heroInput).trim();
     if (!text) return;
     setPendingPrompt({ text, id: `hero-${Date.now()}` });
     setHeroInput('');
-    openDock();
+    setTimeout(() => scrollToId('chat'), 40);
   };
+
+  const initialChatMessages: ChatMessage[] = useMemo(
+    () => [
+      {
+        id: 'greet',
+        text:
+          "Hi — I'm Cadence. Tell me what's on your mind and I'll slot it into your day. " +
+          "Try: ‘Remind me to call Alex tomorrow at 6pm’, ‘Block 90 minutes for deep work Thursday morning’, or ‘What\u2019s on my plate this week?’",
+        sender: 'bot',
+        timestamp: new Date(),
+      },
+    ],
+    []
+  );
 
   const rescheduleTaskToDay = async (taskId: number, isoDay: string) => {
     try {
@@ -956,10 +972,7 @@ const LandingPage: React.FC = () => {
                 ]}
                 accent="#7c6cff"
                 cta="Open chat"
-                onClick={() => {
-                  openDock();
-                  scrollToId('chat');
-                }}
+                onClick={() => scrollToId('chat')}
               />
             </Grid>
             <Grid item xs={12} md={3}>
@@ -1011,13 +1024,13 @@ const LandingPage: React.FC = () => {
         </Container>
       </Box>
 
-      {/* CHAT — floating panel (FAB / dock); this section keeps hash nav + copy */}
+      {/* CHAT — full-page Claude-style conversation */}
       <Box
         component="section"
         id="chat"
-        sx={{ py: { xs: 5, md: 7 }, position: 'relative', scrollMarginTop: 96 }}
+        sx={{ py: { xs: 6, md: 9 }, position: 'relative', scrollMarginTop: 96 }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="md">
           <SectionHeader
             eyebrow="The chat"
             title={
@@ -1025,30 +1038,32 @@ const LandingPage: React.FC = () => {
                 Talk. It&rsquo;ll handle <br /> the scheduling.
               </>
             }
-            subtitle="Cadence lives in a draggable panel on the side—open it anytime from the pulse button or the Chat item in the sidebar. Your hero prompt and nav land there automatically."
+            subtitle="A focused thread—plain language in, dates and tasks out. Same look as the assistants you already trust."
           />
-          <Box
+          <Box sx={{ mt: { xs: 3, md: 5 } }}>
+            <ChatPanel
+              height={720}
+              initialMessages={initialChatMessages}
+              pendingPrompt={pendingPrompt}
+              onReply={() => bumpVersion()}
+              suggestions={[
+                'Plan my week',
+                'Remind me to pay rent on the 1st',
+                'Block focus time tomorrow 9–11am',
+                'What\u2019s due this week?',
+              ]}
+            />
+          </Box>
+          <Typography
             sx={{
-              mt: { xs: 3, md: 4 },
-              maxWidth: 560,
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 1.5,
-              alignItems: 'center',
+              mt: 2,
+              fontSize: 12,
+              color: 'var(--ss-text-mute)',
+              textAlign: 'center',
             }}
           >
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<SmartToy />}
-              onClick={() => openDock()}
-            >
-              Open Cadence chat
-            </Button>
-            <Typography sx={{ fontSize: 13, color: 'var(--ss-text-mute)' }}>
-              Tip: drag tasks from the list onto a calendar day to reschedule.
-            </Typography>
-          </Box>
+            Tip: drag tasks from the list onto a calendar day to reschedule.
+          </Typography>
         </Container>
       </Box>
 

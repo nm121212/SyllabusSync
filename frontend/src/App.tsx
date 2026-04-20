@@ -8,8 +8,6 @@ import LandingPage from './pages/LandingPage.tsx';
 import CalendarSync from './pages/CalendarSync.tsx';
 import { UploadProvider } from './contexts/UploadContext.tsx';
 import { TasksProvider } from './contexts/TasksContext.tsx';
-import { FloatingChatProvider } from './contexts/FloatingChatContext.tsx';
-import FloatingChatDock from './components/FloatingChatDock.tsx';
 
 const theme = createTheme({
   palette: {
@@ -198,11 +196,10 @@ const App: React.FC = () => {
       <CssBaseline />
       <UploadProvider>
         <TasksProvider>
-          <FloatingChatProvider>
-            <Router>
-              <Box className="ss-app-bg">
-                <AppShell>
-                  <Routes>
+          <Router>
+            <Box className="ss-app-bg">
+              <AppShell>
+                <Routes>
                     {/* Everything lives on the landing page except Settings
                         (Google Calendar connection + sync controls), which
                         stays as its own discrete surface. */}
@@ -220,13 +217,11 @@ const App: React.FC = () => {
                     <Route path="/upload" element={<Navigate to="/#capture" replace />} />
                     <Route path="/chatbot" element={<Navigate to="/#chat" replace />} />
                     <Route path="/calendar" element={<Navigate to="/settings" replace />} />
-                  </Routes>
-                </AppShell>
-                <FloatingChatDock />
-                <UploadStatusBar />
-              </Box>
-            </Router>
-          </FloatingChatProvider>
+                </Routes>
+              </AppShell>
+              <UploadStatusBar />
+            </Box>
+          </Router>
         </TasksProvider>
       </UploadProvider>
     </ThemeProvider>
