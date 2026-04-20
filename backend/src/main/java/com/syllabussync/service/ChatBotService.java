@@ -7,12 +7,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.syllabussync.model.Task;
 import com.syllabussync.model.TaskType;
 import com.syllabussync.model.Priority;
+import com.syllabussync.util.PromptDateTimeHelper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -32,7 +35,14 @@ public class ChatBotService {
     @Autowired
     private GenerativeAiClient generativeAiClient;
 
+    @Value("${app.google.calendar.timezone:America/New_York}")
+    private String calendarTimezone;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private ZoneId resolvedZone() {
+        return PromptDateTimeHelper.safeZone(calendarTimezone);
+    }
 
     public Map<String, Object> processMessage(String message) {
         try {
@@ -117,7 +127,9 @@ public class ChatBotService {
             tasksContext = "\n\nCURRENT TASKS: No tasks currently in your dashboard.\n";
         }
         
+        String dateContext = PromptDateTimeHelper.contextBlock(resolvedZone());
         return String.format("""
+            %s
             You are a friendly, helpful AI assistant for a student task management system. You help students organize their academic life through natural conversation and can add tasks to their calendar automatically.
             
             PERSONALITY:
@@ -151,10 +163,10 @@ public class ChatBotService {
             - MEDIUM: Due within 1-2 weeks, regular assignments
             - LOW: Due in more than 2 weeks, less urgent items
             
-            DATE HANDLING (Current date is 2025-10-15):
+            DATE HANDLING (follow AUTHORITATIVE DATE/TIME CONTEXT above — it is the only "now"):
             - Convert all dates to YYYY-MM-DD format
-            - Handle relative dates: "tomorrow" = 2025-10-16, "next Friday", "in 3 days", "next week"
-            - Handle absolute dates: "December 15th", "Jan 20", "3/15/2025"
+            - Handle relative dates using Today's / Tomorrow's dates above (e.g. "tomorrow", "next Friday", "in 3 days", "next week")
+            - Handle absolute dates: "December 15th", "Jan 20", "3/15/2026"
             - If date is unclear, ask for clarification
             
             PLANNING SUGGESTIONS:
@@ -214,7 +226,7 @@ public class ChatBotService {
             %s
             
             Current user message: %s
-            """, tasksContext, userMessage);
+            """, dateContext, tasksContext, userMessage);
     }
 
     private String callGeminiAPI(String message, List<Task> currentTasks) throws IOException, InterruptedException {
@@ -330,9 +342,8 @@ public class ChatBotService {
             for (String format : formats) {
                 try {
                     LocalDate parsed = LocalDate.parse(dateStr, DateTimeFormatter.ofPattern(format));
-                    // If year is 1970 (default), assume current year
                     if (parsed.getYear() == 1970) {
-                        parsed = parsed.withYear(2025);
+                        parsed = parsed.withYear(LocalDate.now(resolvedZone()).getYear());
                     }
                     return parsed;
                 } catch (DateTimeParseException ignored) {
@@ -346,7 +357,7 @@ public class ChatBotService {
 
     private LocalDate parseRelativeDate(String dateStr) {
         String lowerDateStr = dateStr.toLowerCase().trim();
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(resolvedZone());
         
         switch (lowerDateStr) {
             case "today":

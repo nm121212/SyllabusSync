@@ -4,7 +4,9 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.syllabussync.util.PromptDateTimeHelper;
 import java.net.http.HttpResponse;
+import java.time.ZoneId;
 import java.util.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,9 @@ public class IntelligentParsingService {
 
     @Value("${google.gemini.max-tokens:4096}")
     private int maxTokens;
+
+    @Value("${app.google.calendar.timezone:America/New_York}")
+    private String calendarTimezone;
 
     public IntelligentParsingService(GenerativeAiClient generativeAiClient) {
         this.generativeAiClient = generativeAiClient;
@@ -66,24 +71,29 @@ public class IntelligentParsingService {
     }
 
     private String buildPrompt() {
-        return """
+        ZoneId zone = PromptDateTimeHelper.safeZone(calendarTimezone);
+        String dateContext = PromptDateTimeHelper.contextBlock(zone);
+        return dateContext
+                + """
+
             Analyze this syllabus document and extract all assignments, exams, projects, quizzes, and other academic tasks with their due dates.
-            
+
             IMPORTANT DATE EXTRACTION RULES:
-            - Extract dates from ANY format: "October 15, 2025", "Oct 15, 2025", "10/15/2025", "10-15-25", "15th October 2025", "Due: Oct 15", "Deadline: 10/15", etc.
-            - Convert ALL dates to ISO 8601 format: YYYY-MM-DD (e.g., "2025-10-15")
-            - If only month/day given, assume current year 2025
-            - If only day given, try to infer month from context
+            - Use AUTHORITATIVE DATE/TIME CONTEXT above as the only reference for "today", current year, and resolving "next week" / relative phrases.
+            - Extract dates from ANY format: "October 15, 2026", "Oct 15", "10/15/2026", "10-15-26", "15th October", "Due: Oct 15", "Deadline: 10/15", etc.
+            - Convert ALL dates to ISO 8601 calendar form: YYYY-MM-DD
+            - If only month/day is given with no year, assume the current calendar year from the context block above (not a fixed year).
+            - If only day is given, infer month from surrounding syllabus text.
             - Look for keywords: "due", "deadline", "by", "on", "before", "until"
-            - Handle relative dates: "next week", "in 2 weeks", "end of semester" (convert to specific dates)
-            
+            - Handle relative dates: "next week", "in 2 weeks", "end of semester" (convert to concrete YYYY-MM-DD using the context dates).
+
             Return the results as a JSON array where each task has:
             - title: The task name/title
             - description: Brief description of the task
             - dueDate: Due date in YYYY-MM-DD format (REQUIRED)
             - type: One of ASSIGNMENT, PROJECT, EXAM, QUIZ, LAB, PRESENTATION, PAPER, DISCUSSION, OTHER
             - priority: One of LOW, MEDIUM, HIGH, URGENT
-            
+
             Return only valid JSON array, no other text.
             """;
     }
