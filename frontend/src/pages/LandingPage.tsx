@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { Box, Button, Container, Grid, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Container,
+  Divider,
+  Grid,
+  Typography,
+} from '@mui/material';
 import {
   CalendarMonth,
   SmartToy,
@@ -1067,30 +1074,7 @@ const LandingPage: React.FC = () => {
         </Container>
       </Box>
 
-      {/* CAPTURE (doc upload, reframed) ───────────────────────────────── */}
-      <Box component="section" id="capture" sx={{ py: { xs: 7, md: 10 } }}>
-        <Container maxWidth="md">
-          <SectionHeader
-            eyebrow="Capture"
-            title={
-              <>
-                Got a document? <br /> We&rsquo;ll pull the tasks out.
-              </>
-            }
-            subtitle="Drop a meeting note, a project brief, a class syllabus, an itinerary - Cadence extracts every date and action so you can review, then save."
-          />
-
-          {/* The actual uploader - no decorative twin. */}
-          <Box
-            id="capture-dropzone"
-            sx={{ mt: { xs: 4, md: 6 }, scrollMarginTop: 96 }}
-          >
-            <UploadSyllabus embedded />
-          </Box>
-        </Container>
-      </Box>
-
-      {/* TASKS + CALENDAR ─────────────────────────────────────────────── */}
+      {/* TASKS + CALENDAR — main month + sidebar (tasks + compact month) ─ */}
       <Box component="section" id="tasks" sx={{ py: { xs: 8, md: 12 } }}>
         <Container maxWidth="lg">
           <SectionHeader
@@ -1100,31 +1084,32 @@ const LandingPage: React.FC = () => {
                 Plan and execute <br /> in one view.
               </>
             }
-            subtitle="Your task list and month view now live side-by-side, so you can edit work and see dates in one place."
+            subtitle="Full month in the center; your list and a quick month view stay together in the sidebar."
           />
           <Box sx={{ mt: { xs: 4, md: 6 } }}>
-            <Box id="calendar" sx={{ scrollMarginTop: 96 }}>
-              <Card sx={{ overflow: 'hidden' }}>
-                <Grid container>
-                  <Grid
-                    item
-                    xs={12}
-                    lg={8.5}
-                    sx={{
-                      borderRight: {
-                        xs: 'none',
-                        lg: '1px solid rgba(139, 92, 246, 0.16)',
-                      },
-                      borderBottom: {
-                        xs: '1px solid rgba(139, 92, 246, 0.16)',
-                        lg: 'none',
-                      },
-                    }}
-                  >
+            <Card sx={{ overflow: 'hidden' }}>
+              <Grid container>
+                {/* Main: full month (drop targets for dragging from the sidebar) */}
+                <Grid
+                  item
+                  xs={12}
+                  lg={8}
+                  sx={{
+                    borderRight: {
+                      xs: 'none',
+                      lg: '1px solid rgba(139, 92, 246, 0.16)',
+                    },
+                    borderBottom: {
+                      xs: '1px solid rgba(139, 92, 246, 0.16)',
+                      lg: 'none',
+                    },
+                  }}
+                >
+                  <Box id="calendar" sx={{ scrollMarginTop: 96 }}>
                     <CardHeader>
                       <CardTitle>Your month</CardTitle>
                       <CardDescription>
-                        Drag a task from the list onto any day to change its due date.
+                        Drag a task from the sidebar onto any day to reschedule.
                       </CardDescription>
                     </CardHeader>
                     <CardContent sx={{ pt: 0 }}>
@@ -1139,23 +1124,80 @@ const LandingPage: React.FC = () => {
                         onTaskDroppedOnDay={rescheduleTaskToDay}
                       />
                     </CardContent>
-                  </Grid>
-                  <Grid item xs={12} lg={3.5}>
-                    <CardHeader>
-                      <CardTitle>My tasks</CardTitle>
+                  </Box>
+                </Grid>
+
+                {/* Sidebar: tasks + compact calendar together */}
+                <Grid item xs={12} lg={4}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      height: '100%',
+                      minHeight: { lg: 520 },
+                    }}
+                  >
+                    <CardHeader sx={{ pb: 0 }}>
+                      <CardTitle>On your plate</CardTitle>
                       <CardDescription>
-                        Quick edits, completion, and Google sync in one rail.
+                        Your task list and a compact month view in one column.
                       </CardDescription>
                     </CardHeader>
-                    <CardContent sx={{ pt: 0, pb: 1 }}>
-                      {/* The sticky top-bar "+ New task" button is the one canonical
-                          entry point for manual task creation, so no extra CTA here. */}
+                    <CardContent
+                      sx={{
+                        pt: 1,
+                        pb: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 0,
+                        flex: 1,
+                        minHeight: 0,
+                      }}
+                    >
+                      <Typography
+                        variant="overline"
+                        sx={{
+                          letterSpacing: '0.14em',
+                          fontSize: 10,
+                          color: 'var(--ss-text-mute)',
+                          mb: 0.5,
+                        }}
+                      >
+                        My tasks
+                      </Typography>
                       <TasksSection embedded />
+                      <Divider
+                        sx={{
+                          my: 2,
+                          borderColor: 'rgba(139, 92, 246, 0.14)',
+                        }}
+                      />
+                      <Typography
+                        variant="overline"
+                        sx={{
+                          letterSpacing: '0.14em',
+                          fontSize: 10,
+                          color: 'var(--ss-text-mute)',
+                          mb: 1,
+                        }}
+                      >
+                        Month at a glance
+                      </Typography>
+                      <TaskCalendar
+                        tasks={(stats.tasks ?? []) as CalendarTask[]}
+                        variant="compact"
+                        framed={false}
+                        onTaskClick={(t) => {
+                          const e = calendarTaskToEditable(t);
+                          if (e) setCalendarEditTask(e);
+                        }}
+                        onTaskDroppedOnDay={rescheduleTaskToDay}
+                      />
                     </CardContent>
-                  </Grid>
+                  </Box>
                 </Grid>
-              </Card>
-            </Box>
+              </Grid>
+            </Card>
           </Box>
           {stats.calendarConnected === false && (
             <Box
@@ -1176,6 +1218,28 @@ const LandingPage: React.FC = () => {
               </Button>
             </Box>
           )}
+        </Container>
+      </Box>
+
+      {/* CAPTURE — bottom of page (above footer) ───────────────────────── */}
+      <Box component="section" id="capture" sx={{ py: { xs: 7, md: 10 } }}>
+        <Container maxWidth="md">
+          <SectionHeader
+            eyebrow="Capture"
+            title={
+              <>
+                Got a document? <br /> We&rsquo;ll pull the tasks out.
+              </>
+            }
+            subtitle="Drop a meeting note, a project brief, a class syllabus, an itinerary - Cadence extracts every date and action so you can review, then save."
+          />
+
+          <Box
+            id="capture-dropzone"
+            sx={{ mt: { xs: 4, md: 6 }, scrollMarginTop: 96 }}
+          >
+            <UploadSyllabus embedded />
+          </Box>
         </Container>
       </Box>
 

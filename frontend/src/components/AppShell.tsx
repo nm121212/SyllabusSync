@@ -48,9 +48,9 @@ type NavItem = {
 const primaryNav: NavItem[] = [
   { label: 'Today', to: '/#today', icon: <HomeOutlined /> },
   { label: 'Chat', to: '/#chat', icon: <ChatBubbleOutline /> },
-  { label: 'Capture', to: '/#capture', icon: <CloudUploadOutlined /> },
   { label: 'Tasks', to: '/#tasks', icon: <TaskAltOutlined /> },
   { label: 'Calendar', to: '/#calendar', icon: <CalendarMonth /> },
+  { label: 'Capture', to: '/#capture', icon: <CloudUploadOutlined /> },
 ];
 
 const secondaryNav: NavItem[] = [
