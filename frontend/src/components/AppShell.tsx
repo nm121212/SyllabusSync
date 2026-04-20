@@ -23,10 +23,19 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useTasks } from '../contexts/TasksContext.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import AddTaskDialog from './AddTaskDialog.tsx';
 import { API_BASE_URL } from '../config/api.ts';
 import UserMenu from './UserMenu.tsx';
 import PulseChatIcon from './icons/PulseChatIcon.tsx';
+import {
+  SyncRequiresSignInDialog,
+  useSyncSignInPrompt,
+} from './SyncRequiresSignInDialog.tsx';
+import {
+  apiErrorMessageFromResponse,
+  catchApiError,
+} from '../lib/apiErrorMessage.ts';
 
 /**
  * App chrome: a fixed left sidebar with quick nav + a thin top bar with
@@ -423,57 +432,73 @@ type SyncState = 'idle' | 'syncing' | 'ok' | 'error';
 
 const SyncToGoogleButton: React.FC = () => {
   const navigate = useNavigate();
+  const { session } = useAuth();
   const { bumpVersion } = useTasks();
+  const { guardOr, promptOpen, setPromptOpen, authLoading } =
+    useSyncSignInPrompt();
   const [state, setState] = useState<SyncState>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [snackOpen, setSnackOpen] = useState(false);
 
   const runSync = async () => {
     if (state === 'syncing') return;
-    setState('syncing');
-    setMessage(null);
-    try {
-      const statusRes = await fetch(
-        `${API_BASE_URL}/syllabus/calendar/status`
-      );
-      const statusJson = await statusRes.json().catch(() => ({}));
-      if (!statusJson?.connected) {
-        setState('error');
+    await guardOr(async () => {
+      setState('syncing');
+      setMessage(null);
+      try {
+        const statusRes = await fetch(
+          `${API_BASE_URL}/syllabus/calendar/status`
+        );
+        const statusJson = await statusRes.json().catch(() => ({}));
+        if (!statusRes.ok) {
+          throw new Error(
+            apiErrorMessageFromResponse(
+              statusRes,
+              'Could not check Calendar connection.',
+              statusJson?.error
+            )
+          );
+        }
+        if (!statusJson?.connected) {
+          setState('error');
+          setMessage(
+            'Connect Google Calendar first - opening Settings.'
+          );
+          setSnackOpen(true);
+          setTimeout(() => navigate('/settings'), 400);
+          return;
+        }
+
+        const res = await fetch(
+          `${API_BASE_URL}/syllabus/tasks/sync-all-calendar`,
+          { method: 'POST' }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            apiErrorMessageFromResponse(res, 'Sync failed.', data?.error)
+          );
+        }
+        const synced =
+          typeof data?.synced === 'number' ? data.synced : undefined;
+        setState('ok');
         setMessage(
-          'Connect Google Calendar first - opening Settings.'
+          synced === 0
+            ? 'Everything was already on your calendar.'
+            : synced != null
+              ? `Pushed ${synced} task${synced === 1 ? '' : 's'} to Google Calendar.`
+              : 'Pushed everything to Google Calendar.'
         );
         setSnackOpen(true);
-        setTimeout(() => navigate('/settings'), 400);
-        return;
+        bumpVersion();
+        setTimeout(() => setState('idle'), 2500);
+      } catch (e) {
+        setState('error');
+        setMessage(catchApiError(e, session, 'Sync failed.'));
+        setSnackOpen(true);
+        setTimeout(() => setState('idle'), 2500);
       }
-
-      const res = await fetch(
-        `${API_BASE_URL}/syllabus/tasks/sync-all-calendar`,
-        { method: 'POST' }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || 'Sync failed.');
-      }
-      const synced =
-        typeof data?.synced === 'number' ? data.synced : undefined;
-      setState('ok');
-      setMessage(
-        synced === 0
-          ? 'Everything was already on your calendar.'
-          : synced != null
-            ? `Pushed ${synced} task${synced === 1 ? '' : 's'} to Google Calendar.`
-            : 'Pushed everything to Google Calendar.'
-      );
-      setSnackOpen(true);
-      bumpVersion();
-      setTimeout(() => setState('idle'), 2500);
-    } catch (e) {
-      setState('error');
-      setMessage(e instanceof Error ? e.message : 'Sync failed.');
-      setSnackOpen(true);
-      setTimeout(() => setState('idle'), 2500);
-    }
+    });
   };
 
   const label =
@@ -494,6 +519,10 @@ const SyncToGoogleButton: React.FC = () => {
 
   return (
     <>
+      <SyncRequiresSignInDialog
+        open={promptOpen}
+        onClose={() => setPromptOpen(false)}
+      />
       <Tooltip title="Push all tasks to Google Calendar">
         <span>
           <Button
@@ -501,7 +530,7 @@ const SyncToGoogleButton: React.FC = () => {
             color="primary"
             startIcon={icon}
             onClick={runSync}
-            disabled={state === 'syncing'}
+            disabled={state === 'syncing' || authLoading}
             sx={{
               flexShrink: 0,
               whiteSpace: 'nowrap',
@@ -559,6 +588,9 @@ const TopBar: React.FC<{
   subtitle?: string;
 }> = ({ onMobileMenu, subtitle }) => {
   const { openAddTask } = useTasks();
+  const { session, loading: authLoading } = useAuth();
+  const showSignedInActions = !authLoading && !!session;
+
   return (
     <Box
       sx={{
@@ -622,27 +654,31 @@ const TopBar: React.FC<{
           flexShrink: 0,
         }}
       >
-        <SyncToGoogleButton />
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<Add />}
-          onClick={openAddTask}
-          sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
-        >
-          <Box
-            component="span"
-            sx={{ display: { xs: 'none', sm: 'inline' } }}
-          >
-            New task
-          </Box>
-          <Box
-            component="span"
-            sx={{ display: { xs: 'inline', sm: 'none' } }}
-          >
-            New
-          </Box>
-        </Button>
+        {showSignedInActions && (
+          <>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Add />}
+              onClick={openAddTask}
+              sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+            >
+              <Box
+                component="span"
+                sx={{ display: { xs: 'none', sm: 'inline' } }}
+              >
+                New task
+              </Box>
+              <Box
+                component="span"
+                sx={{ display: { xs: 'inline', sm: 'none' } }}
+              >
+                New
+              </Box>
+            </Button>
+            <SyncToGoogleButton />
+          </>
+        )}
         <UserMenu />
       </Box>
     </Box>

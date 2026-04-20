@@ -38,16 +38,15 @@ export interface GoogleSignInButtonProps {
 }
 
 /**
- * Single source of truth for the "Sign in with Google" CTA. When signed
- * out, clicking hands control to Supabase's OAuth flow; when signed in
- * the caller should render something else (we return null here so the
- * button can't accidentally be shown twice).
+ * Single source of truth for Google OAuth CTA (sign up or sign-in same flow).
+ * When signed out, clicking starts Supabase OAuth; when signed in the caller
+ * should render something else (we return null so the button isn't duplicated).
  */
 const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   size = 'large',
   variant = 'contained',
   fullWidth = false,
-  label = 'Sign up with Google',
+  label = 'Sign up / Sign in with Google',
 }) => {
   const { session, loading, signInWithGoogle, configured } = useAuth();
   const [clicking, setClicking] = React.useState(false);

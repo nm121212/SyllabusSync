@@ -40,7 +40,12 @@ import {
   Sync,
   CloudSync,
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import {
+  apiErrorMessageFromResponse,
+  catchApiError,
+} from '../lib/apiErrorMessage.ts';
 
 interface Task {
   id: number;
@@ -80,6 +85,7 @@ const StatsCard: React.FC<{
 );
 
 const Dashboard: React.FC = () => {
+  const { session } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,13 +110,19 @@ const Dashboard: React.FC = () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/syllabus/tasks`);
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error('Failed to fetch tasks');
+        throw new Error(
+          apiErrorMessageFromResponse(
+            response,
+            'Failed to fetch tasks',
+            (data as { error?: string })?.error
+          )
+        );
       }
-      const data = await response.json();
-      setTasks(data);
+      setTasks(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
+      setError(catchApiError(err, session, 'Failed to fetch tasks'));
     } finally {
       setLoading(false);
     }
@@ -127,7 +139,14 @@ const Dashboard: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update task');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessageFromResponse(
+            response,
+            'Failed to update task',
+            (errorData as { error?: string })?.error
+          )
+        );
       }
 
       // Update the task in the local state
@@ -145,7 +164,7 @@ const Dashboard: React.FC = () => {
     } catch (err) {
       setSnackbar({
         open: true,
-        message: 'Failed to update task',
+        message: catchApiError(err, session, 'Failed to update task'),
         severity: 'error'
       });
     }
@@ -176,7 +195,14 @@ const Dashboard: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update task');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessageFromResponse(
+            response,
+            'Failed to update task',
+            (errorData as { error?: string })?.error
+          )
+        );
       }
 
       // Update the task in the local state
@@ -195,7 +221,7 @@ const Dashboard: React.FC = () => {
     } catch (err) {
       setSnackbar({
         open: true,
-        message: 'Failed to update task',
+        message: catchApiError(err, session, 'Failed to update task'),
         severity: 'error'
       });
     }
@@ -215,7 +241,14 @@ const Dashboard: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete task');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessageFromResponse(
+            response,
+            'Failed to delete task',
+            (errorData as { error?: string })?.error
+          )
+        );
       }
 
       // Remove the task from the local state
@@ -230,7 +263,7 @@ const Dashboard: React.FC = () => {
     } catch (err) {
       setSnackbar({
         open: true,
-        message: 'Failed to delete task',
+        message: catchApiError(err, session, 'Failed to delete task'),
         severity: 'error'
       });
     }
@@ -247,7 +280,14 @@ const Dashboard: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete all tasks');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessageFromResponse(
+            response,
+            'Failed to delete all tasks',
+            (errorData as { error?: string })?.error
+          )
+        );
       }
 
       // Clear all tasks from the local state
@@ -262,7 +302,7 @@ const Dashboard: React.FC = () => {
     } catch (err) {
       setSnackbar({
         open: true,
-        message: 'Failed to delete all tasks',
+        message: catchApiError(err, session, 'Failed to delete all tasks'),
         severity: 'error'
       });
     }
@@ -276,24 +316,29 @@ const Dashboard: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to sync to calendar');
+        throw new Error(
+          apiErrorMessageFromResponse(
+            response,
+            'Failed to sync to calendar',
+            (data as { error?: string })?.error
+          )
+        );
       }
 
-      const data = await response.json();
       setSnackbar({ open: true, message: 'Task synced to Google Calendar!', severity: 'success' });
       
       // Update the task with the Google Event ID
       setTasks(tasks.map(task => 
         task.id === taskId 
-          ? { ...task, googleEventId: data.eventId }
+          ? { ...task, googleEventId: (data as { eventId?: string }).eventId }
           : task
       ));
     } catch (err) {
       setSnackbar({ 
         open: true, 
-        message: err instanceof Error ? err.message : 'Failed to sync to calendar', 
+        message: catchApiError(err, session, 'Failed to sync to calendar'), 
         severity: 'error' 
       });
     } finally {
@@ -309,15 +354,20 @@ const Dashboard: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to sync all tasks to calendar');
+        throw new Error(
+          apiErrorMessageFromResponse(
+            response,
+            'Failed to sync all tasks to calendar',
+            (data as { error?: string })?.error
+          )
+        );
       }
 
-      const data = await response.json();
       setSnackbar({ 
         open: true, 
-        message: `Synced ${data.syncedCount} tasks to Google Calendar!`, 
+        message: `Synced ${(data as { syncedCount?: number }).syncedCount ?? 0} tasks to Google Calendar!`, 
         severity: 'success' 
       });
       
@@ -326,7 +376,7 @@ const Dashboard: React.FC = () => {
     } catch (err) {
       setSnackbar({ 
         open: true, 
-        message: err instanceof Error ? err.message : 'Failed to sync all tasks to calendar', 
+        message: catchApiError(err, session, 'Failed to sync all tasks to calendar'), 
         severity: 'error' 
       });
     } finally {

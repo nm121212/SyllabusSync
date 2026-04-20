@@ -21,6 +21,7 @@ import UploadSyllabus from './UploadSyllabus.tsx';
 import { useTasks } from '../contexts/TasksContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
 import { useAuth } from '../contexts/AuthContext.tsx';
+import { apiErrorMessageFromResponse } from '../lib/apiErrorMessage.ts';
 import GoogleSignInButton from '../components/GoogleSignInButton.tsx';
 import EditTaskDialog, {
   type EditableTask,
@@ -494,19 +495,6 @@ const LandingPage: React.FC = () => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const [heroInput, setHeroInput] = useState('');
-  const [pendingPrompt, setPendingPrompt] = useState<
-    { text: string; id: string } | undefined
-  >(undefined);
-
-  const submitHero = (raw?: string) => {
-    const text = (raw ?? heroInput).trim();
-    if (!text) return;
-    setPendingPrompt({ text, id: `hero-${Date.now()}` });
-    setHeroInput('');
-    setTimeout(() => scrollToId('chat'), 40);
-  };
-
   const initialChatMessages: ChatMessage[] = useMemo(
     () => [
       {
@@ -530,7 +518,9 @@ const LandingPage: React.FC = () => {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || 'Could not move task');
+        throw new Error(
+          apiErrorMessageFromResponse(res, 'Could not move task.', body?.error)
+        );
       }
       bumpVersion();
     } catch {
@@ -629,127 +619,50 @@ const LandingPage: React.FC = () => {
                 on your calendar.
               </Typography>
 
-              {/* Primary sign-up CTA — shown only when signed out. Once
-                  the user authenticates we collapse this row so the page
-                  doesn't keep pushing them to sign in. */}
-              {!session && (
-                <Box
-                  sx={{
-                    mt: 3.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <GoogleSignInButton label="Sign up with Google" />
-                  <Typography
-                    sx={{ fontSize: 13, color: 'var(--ss-text-mute)' }}
-                  >
-                    Free during beta &middot; one click &middot; no credit card
-                  </Typography>
-                </Box>
-              )}
-
-              {/* Inline chat prompt – submits straight into the chat section */}
+              {/* Chat entry — sign in to talk to Cadence, or jump to chat once signed in */}
               <Box
-                component="form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submitHero();
-                }}
                 sx={{
                   mt: 4,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  p: 0.75,
-                  pl: 2.25,
-                  maxWidth: 560,
-                  borderRadius: 999,
-                  border: '1px solid rgba(139, 92, 246, 0.35)',
-                  background:
-                    'linear-gradient(180deg, rgba(26,23,51,0.75) 0%, rgba(20,17,39,0.45) 100%)',
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0 20px 40px -24px rgba(124,108,255,0.5)',
+                  maxWidth: 420,
+                  p: { xs: 2.25, sm: 2.75 },
+                  borderRadius: 3,
+                  border: '1px solid rgba(139, 92, 246, 0.22)',
+                  background: 'rgba(14, 12, 28, 0.55)',
+                  backdropFilter: 'blur(12px)',
                 }}
               >
-                <PulseChatIcon size={22} sx={{ flexShrink: 0 }} />
-                <Box
-                  component="input"
-                  value={heroInput}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setHeroInput(e.target.value)
-                  }
-                  placeholder="Remind me to call Alex tomorrow at 6pm…"
-                  sx={{
-                    flex: 1,
-                    bgcolor: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    color: '#fff',
-                    fontSize: 15,
-                    fontFamily: 'inherit',
-                    py: 1.25,
-                    '::placeholder': { color: 'rgba(255,255,255,0.5)' },
-                  }}
-                />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
-                  sx={{ ml: 0.5, flexShrink: 0 }}
-                >
-                  Plan it
-                </Button>
-              </Box>
-
-              {/* Quick-try chips */}
-              <Box
-                sx={{
-                  mt: 2,
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 1,
-                  maxWidth: 560,
-                }}
-              >
-                {[
-                  'Plan my day tomorrow',
-                  'Block 2h deep work Thursday',
-                  'What’s on my plate this week?',
-                ].map((s) => (
-                  <Box
-                    key={s}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => submitHero(s)}
-                    onKeyDown={(e) =>
-                      e.key === 'Enter' ? submitHero(s) : undefined
-                    }
+                {session ? (
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    onClick={() => scrollToId('chat')}
+                    endIcon={<ArrowForward sx={{ fontSize: 18 }} />}
                     sx={{
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: 999,
-                      fontSize: 12.5,
-                      fontWeight: 500,
-                      color: 'rgba(255,255,255,0.72)',
-                      background: 'rgba(124,108,255,0.08)',
-                      border: '1px solid rgba(139,92,246,0.25)',
-                      cursor: 'pointer',
-                      transition: 'all 160ms ease',
-                      '&:hover': {
-                        background: 'rgba(124,108,255,0.2)',
-                        borderColor: 'rgba(139,92,246,0.55)',
-                        color: '#fff',
-                      },
+                      py: 1.25,
+                      fontSize: 16,
+                      fontWeight: 600,
                     }}
                   >
-                    {s}
+                    Start planning
+                  </Button>
+                ) : (
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography
+                      sx={{
+                        fontSize: 16,
+                        fontWeight: 600,
+                        letterSpacing: '-0.02em',
+                        color: 'rgba(255,255,255,0.92)',
+                        mb: 2,
+                      }}
+                    >
+                      Sign in to start chatting
+                    </Typography>
+                    <GoogleSignInButton fullWidth />
                   </Box>
-                ))}
+                )}
               </Box>
 
               {/* Real stats only - never marketing filler. When the
@@ -1060,7 +973,6 @@ const LandingPage: React.FC = () => {
             <ChatPanel
               height={720}
               initialMessages={initialChatMessages}
-              pendingPrompt={pendingPrompt}
               onReply={() => bumpVersion()}
               suggestions={[
                 'Plan my week',
@@ -1232,31 +1144,13 @@ const LandingPage: React.FC = () => {
           <Box
             sx={{
               display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              alignItems: { xs: 'flex-start', sm: 'center' },
-              gap: 1.5,
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               color: 'var(--ss-text-mute)',
               fontSize: 13,
             }}
           >
-            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-              <Box
-                aria-hidden
-                sx={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 999,
-                  background: '#22d3ee',
-                  boxShadow: '0 0 8px #22d3ee',
-                }}
-              />
-              <span>Free during beta - no credit card needed.</span>
-            </Box>
-            <Box>
-              &copy; {new Date().getFullYear()} Cadence &middot; Your day, in
-              rhythm.
-            </Box>
+            &copy; {new Date().getFullYear()} Cadence &middot; Your day, in
+            rhythm.
           </Box>
         </Container>
       </Box>

@@ -20,7 +20,16 @@ import {
   Sync,
 } from '@mui/icons-material';
 import PageHeader from '../components/PageHeader.tsx';
+import {
+  SyncRequiresSignInDialog,
+  useSyncSignInPrompt,
+} from '../components/SyncRequiresSignInDialog.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import {
+  apiErrorMessageFromResponse,
+  catchApiError,
+} from '../lib/apiErrorMessage.ts';
 
 /**
  * Settings surface - formerly "Calendar" with a giant duplicate month
@@ -43,6 +52,9 @@ interface SyncedTask {
 }
 
 const CalendarSync: React.FC = () => {
+  const { session } = useAuth();
+  const { guardOr, promptOpen, setPromptOpen, authLoading } =
+    useSyncSignInPrompt();
   const [connected, setConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -102,28 +114,44 @@ const CalendarSync: React.FC = () => {
   };
 
   const handleConnect = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      /* /api/auth/google/url is served by AuthController — it reads the
-         current Supabase user from the JWT (via our fetch interceptor)
-         and returns an authUrl whose `state` param is a signed JWT
-         carrying that user id. The legacy `/syllabus/auth/google/url`
-         endpoint was removed in the per-user refactor. */
+    await guardOr(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        /* /api/auth/google/url is served by AuthController — it reads the
+           current Supabase user from the JWT (via our fetch interceptor)
+           and returns an authUrl whose `state` param is a signed JWT
+           carrying that user id. The legacy `/syllabus/auth/google/url`
+           endpoint was removed in the per-user refactor. */
       const response = await fetch(`${API_BASE_URL}/auth/google/url`);
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(
+          apiErrorMessageFromResponse(
+            response,
+            'Couldn\u2019t get the Google sign-in link. Try again.',
+            data?.error
+          )
+        );
+        return;
+      }
       if (data.authUrl) {
         window.location.href = data.authUrl;
       } else {
         setError('Couldn\u2019t get the Google sign-in link. Try again.');
       }
-    } catch {
+    } catch (e) {
       setError(
-        'Network error - check that the backend is running, then try again.'
+        catchApiError(
+          e,
+          session,
+          'Network error - check that the backend is running, then try again.'
+        )
       );
     } finally {
       setLoading(false);
     }
+    });
   };
 
   const handleSync = async () => {
@@ -131,53 +159,72 @@ const CalendarSync: React.FC = () => {
       setError('Connect Google Calendar first.');
       return;
     }
-    setSyncing(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const tasksResponse = await fetch(`${API_BASE_URL}/syllabus/tasks`);
-      const tasks = await tasksResponse.json();
-      if (!Array.isArray(tasks) || tasks.length === 0) {
-        setError('Nothing to sync yet - add a task first.');
-        return;
-      }
-
-      const tasksByCourse = tasks.reduce((acc: any, task: any) => {
-        const key = task.courseName || 'Personal';
-        (acc[key] ||= []).push(task);
-        return acc;
-      }, {});
-
-      for (const [bucket, bucketTasks] of Object.entries(tasksByCourse)) {
-        const syncResponse = await fetch(
-          `${API_BASE_URL}/syllabus/generate-calendar`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tasks: bucketTasks, courseName: bucket }),
-          }
-        );
-        if (!syncResponse.ok) {
-          const errorData = await syncResponse.json().catch(() => ({}));
+    await guardOr(async () => {
+      setSyncing(true);
+      setError(null);
+      setSuccess(null);
+      try {
+        const tasksResponse = await fetch(`${API_BASE_URL}/syllabus/tasks`);
+        const tasks = await tasksResponse.json().catch(() => null);
+        if (!tasksResponse.ok) {
           throw new Error(
-            (errorData as any)?.error || 'Couldn\u2019t sync. Try again.'
+            apiErrorMessageFromResponse(
+              tasksResponse,
+              'Could not load tasks.',
+              (tasks as { error?: string } | null)?.error
+            )
           );
         }
-      }
+        if (!Array.isArray(tasks) || tasks.length === 0) {
+          setError('Nothing to sync yet - add a task first.');
+          return;
+        }
 
-      setSuccess('Everything pushed to Google Calendar.');
-      fetchSyncedTasks();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Couldn\u2019t sync.');
-    } finally {
-      setSyncing(false);
-    }
+        const tasksByCourse = tasks.reduce((acc: any, task: any) => {
+          const key = task.courseName || 'Personal';
+          (acc[key] ||= []).push(task);
+          return acc;
+        }, {});
+
+        for (const [bucket, bucketTasks] of Object.entries(tasksByCourse)) {
+          const syncResponse = await fetch(
+            `${API_BASE_URL}/syllabus/generate-calendar`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tasks: bucketTasks, courseName: bucket }),
+            }
+          );
+          if (!syncResponse.ok) {
+            const errorData = await syncResponse.json().catch(() => ({}));
+            throw new Error(
+              apiErrorMessageFromResponse(
+                syncResponse,
+                'Couldn\u2019t sync. Try again.',
+                (errorData as { error?: string })?.error
+              )
+            );
+          }
+        }
+
+        setSuccess('Everything pushed to Google Calendar.');
+        fetchSyncedTasks();
+      } catch (err) {
+        setError(catchApiError(err, session, 'Couldn\u2019t sync.'));
+      } finally {
+        setSyncing(false);
+      }
+    });
   };
 
   const unsyncedCount = Math.max(totalTasks - syncedTasks.length, 0);
 
   return (
     <Box>
+      <SyncRequiresSignInDialog
+        open={promptOpen}
+        onClose={() => setPromptOpen(false)}
+      />
       <PageHeader
         eyebrow="Settings"
         title="Google Calendar"
@@ -252,7 +299,7 @@ const CalendarSync: React.FC = () => {
               onClick={handleConnect}
               startIcon={<CalendarMonth />}
               color={connected ? 'primary' : 'primary'}
-              disabled={loading}
+              disabled={loading || authLoading}
             >
               {loading
                 ? 'Connecting\u2026'
@@ -272,7 +319,7 @@ const CalendarSync: React.FC = () => {
                     <Sync />
                   )
                 }
-                disabled={syncing || totalTasks === 0}
+                disabled={syncing || totalTasks === 0 || authLoading}
               >
                 {syncing
                   ? 'Syncing\u2026'

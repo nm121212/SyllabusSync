@@ -30,7 +30,16 @@ import {
   FiberManualRecord,
 } from '@mui/icons-material';
 import PageHeader from '../components/PageHeader.tsx';
+import {
+  SyncRequiresSignInDialog,
+  useSyncSignInPrompt,
+} from '../components/SyncRequiresSignInDialog.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import {
+  apiErrorMessageFromResponse,
+  catchApiError,
+} from '../lib/apiErrorMessage.ts';
 
 interface Task {
   id: string;
@@ -91,6 +100,9 @@ const formatDueDate = (iso: string): string => {
 };
 
 const UploadSyllabus: React.FC<UploadSyllabusProps> = ({ embedded = false }) => {
+  const { session } = useAuth();
+  const { guardOr, promptOpen, setPromptOpen, authLoading } =
+    useSyncSignInPrompt();
   const { startUpload, updateUploadProgress, updateUploadStatus } = useUpload();
   const { bumpVersion } = useTasks();
 
@@ -145,7 +157,7 @@ const UploadSyllabus: React.FC<UploadSyllabusProps> = ({ embedded = false }) => 
       });
       updateUploadProgress(uploadId, 75);
       updateUploadStatus(uploadId, 'parsing');
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (response.ok) {
         updateUploadProgress(uploadId, 100);
@@ -156,65 +168,88 @@ const UploadSyllabus: React.FC<UploadSyllabusProps> = ({ embedded = false }) => 
            (TasksSection, TaskCalendar, hero stats) refetch. */
         bumpVersion();
       } else {
-        updateUploadStatus(uploadId, 'error', null, data.error || 'Upload failed');
-        setError(data.error || 'We couldn\u2019t read that file. Try another.');
+        const msg = apiErrorMessageFromResponse(
+          response,
+          'We couldn\u2019t read that file. Try another.',
+          data?.error
+        );
+        updateUploadStatus(uploadId, 'error', null, msg);
+        setError(msg);
       }
-    } catch {
-      updateUploadStatus(uploadId, 'error', null, 'Network error occurred');
-      setError(
+    } catch (err) {
+      const msg = catchApiError(
+        err,
+        session,
         'Network error - check that the backend is running, then try again.'
       );
+      updateUploadStatus(uploadId, 'error', null, msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSyncToCalendar = async () => {
-    setSyncLoading(true);
-    setSyncError(null);
-    setSyncSuccess(false);
-    try {
-      const tasksResponse = await fetch(`${API_BASE_URL}/syllabus/tasks`);
-      const tasks = await tasksResponse.json();
+    await guardOr(async () => {
+      setSyncLoading(true);
+      setSyncError(null);
+      setSyncSuccess(false);
+      try {
+        const tasksResponse = await fetch(`${API_BASE_URL}/syllabus/tasks`);
+        const tasks = await tasksResponse.json().catch(() => null);
 
-      if (!Array.isArray(tasks) || tasks.length === 0) {
-        setSyncError('No tasks to sync yet.');
-        return;
-      }
-
-      // Group by course so we use the existing per-course sync endpoint.
-      const tasksByCourse = tasks.reduce((acc: any, task: any) => {
-        const key = task.courseName || 'Personal';
-        (acc[key] ||= []).push(task);
-        return acc;
-      }, {});
-
-      for (const [bucket, bucketTasks] of Object.entries(tasksByCourse)) {
-        const syncResponse = await fetch(
-          `${API_BASE_URL}/syllabus/generate-calendar`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tasks: bucketTasks, courseName: bucket }),
-          }
-        );
-        if (!syncResponse.ok) {
-          const errorData = await syncResponse.json().catch(() => ({}));
+        if (!tasksResponse.ok) {
           throw new Error(
-            (errorData as any)?.error ||
-              'Sync failed. Make sure Google Calendar is connected in Settings.'
+            apiErrorMessageFromResponse(
+              tasksResponse,
+              'Could not load tasks.',
+              (tasks as { error?: string } | null)?.error
+            )
           );
         }
+
+        if (!Array.isArray(tasks) || tasks.length === 0) {
+          setSyncError('No tasks to sync yet.');
+          return;
+        }
+
+        // Group by course so we use the existing per-course sync endpoint.
+        const tasksByCourse = tasks.reduce((acc: any, task: any) => {
+          const key = task.courseName || 'Personal';
+          (acc[key] ||= []).push(task);
+          return acc;
+        }, {});
+
+        for (const [bucket, bucketTasks] of Object.entries(tasksByCourse)) {
+          const syncResponse = await fetch(
+            `${API_BASE_URL}/syllabus/generate-calendar`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tasks: bucketTasks, courseName: bucket }),
+            }
+          );
+          if (!syncResponse.ok) {
+            const errorData = await syncResponse.json().catch(() => ({}));
+            throw new Error(
+              apiErrorMessageFromResponse(
+                syncResponse,
+                'Sync failed. Connect Google Calendar in Settings after you sign in.',
+                (errorData as { error?: string })?.error
+              )
+            );
+          }
+        }
+        setSyncSuccess(true);
+        bumpVersion();
+      } catch (err) {
+        setSyncError(
+          catchApiError(err, session, 'Could not sync to Google Calendar.')
+        );
+      } finally {
+        setSyncLoading(false);
       }
-      setSyncSuccess(true);
-      bumpVersion();
-    } catch (err) {
-      setSyncError(
-        err instanceof Error ? err.message : 'Could not sync to Google Calendar.'
-      );
-    } finally {
-      setSyncLoading(false);
-    }
+    });
   };
 
   const resetFlow = () => {
@@ -228,7 +263,12 @@ const UploadSyllabus: React.FC<UploadSyllabusProps> = ({ embedded = false }) => 
   };
 
   return (
-    <Box>
+    <>
+      <SyncRequiresSignInDialog
+        open={promptOpen}
+        onClose={() => setPromptOpen(false)}
+      />
+      <Box>
       {!embedded && (
         <PageHeader
           eyebrow="Capture"
@@ -457,7 +497,7 @@ const UploadSyllabus: React.FC<UploadSyllabusProps> = ({ embedded = false }) => 
                     )
                   }
                   onClick={handleSyncToCalendar}
-                  disabled={syncLoading}
+                  disabled={syncLoading || authLoading}
                 >
                   {syncLoading
                     ? 'Syncing\u2026'
@@ -470,7 +510,8 @@ const UploadSyllabus: React.FC<UploadSyllabusProps> = ({ embedded = false }) => 
           )}
         </CardContent>
       </Card>
-    </Box>
+      </Box>
+    </>
   );
 };
 

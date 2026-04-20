@@ -15,11 +15,11 @@ import GoogleSignInButton from './GoogleSignInButton.tsx';
 
 /**
  * Top-right auth widget used in the app shell. Two states:
- *   • Signed out → a compact "Sign in" button that kicks off Google OAuth.
+ *   • Signed out → compact "Sign up / Sign in" Google OAuth button.
  *   • Signed in  → explicit "Sign out" button + avatar menu.
  *
  * We deliberately render nothing while the first session fetch is in
- * flight so there's no flicker from "Sign in" → avatar on every reload.
+ * flight so there's no flicker from the auth button → avatar on every reload.
  */
 const UserMenu: React.FC = () => {
   const { session, user, loading, signOut, configured } = useAuth();
@@ -34,7 +34,7 @@ const UserMenu: React.FC = () => {
       <GoogleSignInButton
         size="small"
         variant="outlined"
-        label={configured ? 'Sign in' : 'Sign-in unavailable'}
+        label={configured ? 'Sign up / Sign in' : 'Sign-in unavailable'}
       />
     );
   }

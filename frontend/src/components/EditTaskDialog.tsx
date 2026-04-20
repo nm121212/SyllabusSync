@@ -10,7 +10,12 @@ import {
   MenuItem,
   TextField,
 } from '@mui/material';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import {
+  apiErrorMessageFromResponse,
+  catchApiError,
+} from '../lib/apiErrorMessage.ts';
 
 export type EditableTask = {
   id: number;
@@ -60,6 +65,7 @@ const EditTaskDialog: React.FC<EditTaskDialogProps> = ({
   onClose,
   onSaved,
 }) => {
+  const { session } = useAuth();
   const [form, setForm] = useState<FormState>({
     title: '',
     description: '',
@@ -115,11 +121,17 @@ const EditTaskDialog: React.FC<EditTaskDialogProps> = ({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || 'Could not save task edits.');
+        throw new Error(
+          apiErrorMessageFromResponse(
+            res,
+            'Could not save task edits.',
+            body?.error
+          )
+        );
       }
       onSaved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(catchApiError(e, session, 'Something went wrong.'));
     } finally {
       setBusy(false);
     }

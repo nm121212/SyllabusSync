@@ -26,9 +26,18 @@ import {
   Search,
 } from '@mui/icons-material';
 import { useTasks } from '../contexts/TasksContext.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import {
+  apiErrorMessageFromResponse,
+  catchApiError,
+} from '../lib/apiErrorMessage.ts';
 import { CADENCE_TASK_DRAG_TYPE } from '../lib/cadenceDrag.ts';
 import EditTaskDialog from './EditTaskDialog.tsx';
+import {
+  SyncRequiresSignInDialog,
+  useSyncSignInPrompt,
+} from './SyncRequiresSignInDialog.tsx';
 
 /**
  * "Tasks" card on the landing: a compact, scannable list of everything on
@@ -87,6 +96,8 @@ const isOverdue = (t: BackendTask): boolean => {
 type TaskFilter = 'all' | 'open' | 'done';
 
 const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
+  const { guardOr, promptOpen, setPromptOpen } = useSyncSignInPrompt();
+  const { session, signInWithGoogle, configured } = useAuth();
   const { version, bumpVersion, openAddTask } = useTasks();
   const [tasks, setTasks] = useState<BackendTask[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -116,17 +127,36 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
     (async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/syllabus/tasks`);
-        if (!res.ok) throw new Error('fetch failed');
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          if (!cancelled) {
+            setError(
+              apiErrorMessageFromResponse(
+                res,
+                'Could not load tasks.',
+                body?.error
+              )
+            );
+            setTasks([]);
+          }
+          return;
+        }
         const data: BackendTask[] = await res.json();
-        if (!cancelled) setTasks(Array.isArray(data) ? data : []);
-      } catch {
-        if (!cancelled) setTasks([]);
+        if (!cancelled) {
+          setTasks(Array.isArray(data) ? data : []);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setTasks([]);
+          setError(catchApiError(e, session, 'Could not load tasks.'));
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [version]);
+  }, [version, session]);
 
   const sorted = useMemo(() => {
     if (!tasks) return [];
@@ -183,10 +213,15 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
           body: JSON.stringify({ status: nextStatus }),
         }
       );
-      if (!res.ok) throw new Error('Could not update task.');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessageFromResponse(res, 'Could not update task.', body?.error)
+        );
+      }
       bumpVersion();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(catchApiError(e, session, 'Something went wrong.'));
     } finally {
       setPending(t.id, false);
     }
@@ -200,10 +235,15 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
       const res = await fetch(`${API_BASE_URL}/syllabus/tasks/${t.id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Could not delete task.');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessageFromResponse(res, 'Could not delete task.', body?.error)
+        );
+      }
       bumpVersion();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(catchApiError(e, session, 'Something went wrong.'));
     } finally {
       setPending(t.id, false);
     }
@@ -227,10 +267,25 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
         (r) => r.status === 'fulfilled' && (r.value as Response).ok
       ).length;
       if (ok === 0 && done.length > 0) {
+        const failed = results.find(
+          (r): r is PromiseFulfilledResult<Response> =>
+            r.status === 'fulfilled' && !(r.value as Response).ok
+        );
+        if (failed) {
+          const fr = failed.value;
+          const body = await fr.json().catch(() => ({}));
+          throw new Error(
+            apiErrorMessageFromResponse(
+              fr,
+              'Could not clear completed tasks.',
+              body?.error
+            )
+          );
+        }
         throw new Error('Could not clear completed tasks.');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(catchApiError(e, session, 'Something went wrong.'));
     } finally {
       setBulkBusy(false);
       setBulkAnchor(null);
@@ -247,9 +302,14 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
       const res = await fetch(`${API_BASE_URL}/syllabus/tasks`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Could not delete tasks.');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessageFromResponse(res, 'Could not delete tasks.', body?.error)
+        );
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(catchApiError(e, session, 'Something went wrong.'));
     } finally {
       setBulkBusy(false);
       setBulkAnchor(null);
@@ -265,42 +325,53 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
 
   const syncToGoogle = async (t: BackendTask) => {
     setMenuAnchor(null);
-    setPending(t.id, true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `${API_BASE_URL}/syllabus/tasks/${t.id}/sync-calendar`,
-        { method: 'POST' }
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(
-          body?.error || 'Could not sync. Connect Google Calendar first.'
+    await guardOr(async () => {
+      setPending(t.id, true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/syllabus/tasks/${t.id}/sync-calendar`,
+          { method: 'POST' }
         );
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(
+            apiErrorMessageFromResponse(
+              res,
+              'Could not sync. Connect Google Calendar in Settings after you sign in.',
+              body?.error
+            )
+          );
+        }
+        bumpVersion();
+      } catch (e) {
+        setError(catchApiError(e, session, 'Could not sync.'));
+      } finally {
+        setPending(t.id, false);
       }
-      bumpVersion();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not sync.');
-    } finally {
-      setPending(t.id, false);
-    }
+    });
   };
 
   const loading = tasks === null;
 
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        borderRadius: embedded ? 0 : 4,
-        border: embedded ? 'none' : '1px solid rgba(139, 92, 246, 0.22)',
-        background: embedded
-          ? 'transparent'
-          : 'linear-gradient(180deg, rgba(26,23,51,0.75) 0%, rgba(20,17,39,0.45) 100%)',
-        backdropFilter: embedded ? 'none' : 'blur(10px)',
-        overflow: 'hidden',
-      }}
-    >
+    <>
+      <SyncRequiresSignInDialog
+        open={promptOpen}
+        onClose={() => setPromptOpen(false)}
+      />
+      <Box
+        sx={{
+          position: 'relative',
+          borderRadius: embedded ? 0 : 4,
+          border: embedded ? 'none' : '1px solid rgba(139, 92, 246, 0.22)',
+          background: embedded
+            ? 'transparent'
+            : 'linear-gradient(180deg, rgba(26,23,51,0.75) 0%, rgba(20,17,39,0.45) 100%)',
+          backdropFilter: embedded ? 'none' : 'blur(10px)',
+          overflow: 'hidden',
+        }}
+      >
       {/* Header */}
       <Box
         sx={{
@@ -543,7 +614,17 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
           sx={{ m: 2, borderRadius: 2 }}
           onClose={() => setError(null)}
           action={
-            /Connect Google Calendar/i.test(error) ? (
+            /Sign in with Google first/i.test(error) ? (
+              <Button
+                color="inherit"
+                size="small"
+                sx={{ fontWeight: 600 }}
+                disabled={!configured}
+                onClick={() => void signInWithGoogle()}
+              >
+                Sign in
+              </Button>
+            ) : /Connect Google Calendar/i.test(error) ? (
               <Button
                 component="a"
                 href="/settings"
@@ -888,7 +969,8 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
           bumpVersion();
         }}
       />
-    </Box>
+      </Box>
+    </>
   );
 };
 

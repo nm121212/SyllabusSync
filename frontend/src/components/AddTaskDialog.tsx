@@ -17,7 +17,12 @@ import {
 } from '@mui/material';
 import { Close, AutoAwesome } from '@mui/icons-material';
 import { useTasks } from '../contexts/TasksContext.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import {
+  apiErrorMessageFromResponse,
+  catchApiError,
+} from '../lib/apiErrorMessage.ts';
 
 /**
  * Manual task creation. Posts a single-item batch to the existing
@@ -64,6 +69,7 @@ const QUICK_DATES: { label: string; iso: () => string }[] = [
 ];
 
 const AddTaskDialog: React.FC = () => {
+  const { session } = useAuth();
   const { isAddTaskOpen, closeAddTask, bumpVersion } = useTasks();
 
   const [title, setTitle] = useState('');
@@ -151,12 +157,18 @@ const AddTaskDialog: React.FC = () => {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || 'Could not save the task.');
+        throw new Error(
+          apiErrorMessageFromResponse(
+            res,
+            'Could not save the task.',
+            body?.error
+          )
+        );
       }
       bumpVersion();
       closeAddTask();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(catchApiError(e, session, 'Something went wrong.'));
     } finally {
       setSubmitting(false);
     }

@@ -21,6 +21,12 @@ import {
 } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
 import { API_BASE_URL } from '../config/api.ts';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import {
+  apiErrorMessageFromResponse,
+  catchApiError,
+  MESSAGE_SIGN_IN_FIRST,
+} from '../lib/apiErrorMessage.ts';
 import PulseChatIcon from './icons/PulseChatIcon.tsx';
 
 export interface ChatMessage {
@@ -102,6 +108,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   hideHeader = false,
   pendingPrompt,
 }) => {
+  const { session } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -149,8 +156,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
       });
-      if (!res.ok) throw new Error('Request failed');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          apiErrorMessageFromResponse(res, 'Request failed.', data?.error)
+        );
+      }
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         text: data.response,
@@ -160,13 +171,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       };
       setMessages((prev) => [...prev, botMsg]);
       onReply?.(botMsg);
-    } catch {
-      setError('I couldn’t reach the assistant. Try again in a moment.');
+    } catch (e) {
+      const errMsg = catchApiError(
+        e,
+        session,
+        'I couldn’t reach the assistant. Try again in a moment.'
+      );
+      setError(errMsg);
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          text: "I'm sorry, something went wrong on my end. Try rephrasing, or check that the backend is running.",
+          text:
+            errMsg === MESSAGE_SIGN_IN_FIRST
+              ? errMsg
+              : "I'm sorry, something went wrong on my end. Try rephrasing, or check that the backend is running.",
           sender: 'bot',
           timestamp: new Date(),
         },
