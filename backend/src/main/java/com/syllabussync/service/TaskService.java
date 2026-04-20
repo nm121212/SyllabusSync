@@ -189,6 +189,9 @@ public class TaskService {
         if (updates.containsKey("priority")) {
             task.setPriority(Priority.valueOf((String) updates.get("priority")));
         }
+        if (updates.containsKey("type")) {
+            task.setType(TaskType.valueOf((String) updates.get("type")));
+        }
         if (updates.containsKey("dueDate")) {
             task.setDueDate(parseDate((String) updates.get("dueDate")));
         }

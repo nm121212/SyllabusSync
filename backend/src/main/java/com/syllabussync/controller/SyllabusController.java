@@ -275,6 +275,10 @@ public class SyllabusController {
                 updatedTask.getPriority() != null ? updatedTask.getPriority().name() : null
             );
             taskPayload.put(
+                "type",
+                updatedTask.getType() != null ? updatedTask.getType().name() : null
+            );
+            taskPayload.put(
                 "dueDate",
                 updatedTask.getDueDate() != null ? updatedTask.getDueDate().toString() : null
             );

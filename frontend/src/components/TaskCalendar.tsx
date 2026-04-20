@@ -17,6 +17,8 @@ interface TaskCalendarProps {
   tasks: CalendarTask[];
   /** "full" = roomy grid for the Calendar page, "compact" = smaller preview for landing */
   variant?: 'full' | 'compact';
+  /** When false, render without outer card chrome (for split-layout embedding). */
+  framed?: boolean;
 }
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -64,6 +66,7 @@ const parseIso = (s: string): Date | null => {
 const TaskCalendar: React.FC<TaskCalendarProps> = ({
   tasks,
   variant = 'full',
+  framed = true,
 }) => {
   const compact = variant === 'compact';
   const today = useMemo(() => {
@@ -123,12 +126,13 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
   return (
     <Box
       sx={{
-        borderRadius: 4,
-        border: '1px solid rgba(139, 92, 246, 0.25)',
-        background:
-          'linear-gradient(180deg, rgba(26,23,51,0.8) 0%, rgba(20,17,39,0.5) 100%)',
-        backdropFilter: 'blur(10px)',
-        p: compact ? 2 : 3,
+        borderRadius: framed ? 4 : 0,
+        border: framed ? '1px solid rgba(139, 92, 246, 0.25)' : 'none',
+        background: framed
+          ? 'linear-gradient(180deg, rgba(26,23,51,0.8) 0%, rgba(20,17,39,0.5) 100%)'
+          : 'transparent',
+        backdropFilter: framed ? 'blur(10px)' : 'none',
+        p: compact ? 2 : framed ? 3 : 2,
       }}
     >
       {/* Header: month + nav */}

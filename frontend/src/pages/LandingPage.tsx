@@ -12,6 +12,13 @@ import {
 import TaskCalendar, { CalendarTask } from '../components/TaskCalendar.tsx';
 import ChatPanel, { ChatMessage } from '../components/ChatPanel.tsx';
 import TasksSection from '../components/TasksSection.tsx';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card.tsx';
 import UploadSyllabus from './UploadSyllabus.tsx';
 import { useTasks } from '../contexts/TasksContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
@@ -364,6 +371,15 @@ const useLiveStats = (
       cancelled = true;
     };
   }, [reloadKey, sharedVersion]);
+
+  /* Keep the tasks+calendar split view "live" even if a task was created
+     through a path that didn't bump the shared version. */
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setReloadKey((k) => k + 1);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const stats = useMemo<LiveStats>(() => {
     if (tasks === null) {
@@ -996,9 +1012,7 @@ const LandingPage: React.FC = () => {
               height={640}
               initialMessages={initialChatMessages}
               pendingPrompt={pendingPrompt}
-              onReply={(msg) => {
-                if (msg.taskCreated) bumpVersion();
-              }}
+              onReply={() => bumpVersion()}
               suggestions={[
                 'Plan my week',
                 'Remind me to pay rent on the 1st',
@@ -1033,58 +1047,68 @@ const LandingPage: React.FC = () => {
         </Container>
       </Box>
 
-      {/* TASKS ─────────────────────────────────────────────────────────── */}
+      {/* TASKS + CALENDAR ─────────────────────────────────────────────── */}
       <Box component="section" id="tasks" sx={{ py: { xs: 8, md: 12 } }}>
         <Container maxWidth="lg">
           <SectionHeader
-            eyebrow="Tasks"
+            eyebrow="Tasks + calendar"
             title={
               <>
-                Everything you need <br /> to get done.
+                Plan and execute <br /> in one view.
               </>
             }
-            subtitle="A flat, fast list of what's on your plate. Add manually, complete in a click, or push straight to Google Calendar."
+            subtitle="Your task list and month view now live side-by-side, so you can edit work and see dates in one place."
           />
-          <Box sx={{ mt: { xs: 4, md: 6 }, maxWidth: 880, mx: 'auto' }}>
-            {/* The sticky top-bar "+ New task" button is the one canonical
-                entry point for manual task creation, so no extra CTA here. */}
-            <TasksSection />
-          </Box>
-        </Container>
-      </Box>
-
-      {/* Dashboard section removed - hero card already shows live stats. */}
-
-      {/* CALENDAR ─────────────────────────────────────────────────────── */}
-      <Box component="section" id="calendar" sx={{ py: { xs: 7, md: 10 } }}>
-        <Container maxWidth="lg">
-          <SectionHeader
-            eyebrow="Your calendar"
-            title={
-              stats.hasData ? (
-                <>
-                  {stats.total} things, <br /> already on the right days.
-                </>
-              ) : (
-                <>
-                  Your calendar, <br /> waiting for a plan.
-                </>
-              )
-            }
-            subtitle={
-              stats.hasData
-                ? 'Month view of what you\u2019ve scheduled. Synced items show a small check - everything else is one click away from Google Calendar.'
-                : 'Chat something in above, or drop a document, and it will appear here - colour-coded by type, and flagged when it lands on Google Calendar.'
-            }
-          />
-
           <Box sx={{ mt: { xs: 4, md: 6 } }}>
-            <TaskCalendar
-              tasks={(stats.tasks ?? []) as CalendarTask[]}
-              variant="full"
-            />
+            <Box id="calendar" sx={{ scrollMarginTop: 96 }}>
+              <Card sx={{ overflow: 'hidden' }}>
+                <Grid container>
+                  <Grid
+                    item
+                    xs={12}
+                    lg={8.5}
+                    sx={{
+                      borderRight: {
+                        xs: 'none',
+                        lg: '1px solid rgba(139, 92, 246, 0.16)',
+                      },
+                      borderBottom: {
+                        xs: '1px solid rgba(139, 92, 246, 0.16)',
+                        lg: 'none',
+                      },
+                    }}
+                  >
+                    <CardHeader>
+                      <CardTitle>Your month</CardTitle>
+                      <CardDescription>
+                        Drag your eyes across the month and spot due dates instantly.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent sx={{ pt: 0 }}>
+                      <TaskCalendar
+                        tasks={(stats.tasks ?? []) as CalendarTask[]}
+                        variant="full"
+                        framed={false}
+                      />
+                    </CardContent>
+                  </Grid>
+                  <Grid item xs={12} lg={3.5}>
+                    <CardHeader>
+                      <CardTitle>My tasks</CardTitle>
+                      <CardDescription>
+                        Quick edits, completion, and Google sync in one rail.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent sx={{ pt: 0, pb: 1 }}>
+                      {/* The sticky top-bar "+ New task" button is the one canonical
+                          entry point for manual task creation, so no extra CTA here. */}
+                      <TasksSection embedded />
+                    </CardContent>
+                  </Grid>
+                </Grid>
+              </Card>
+            </Box>
           </Box>
-
           {stats.calendarConnected === false && (
             <Box
               sx={{

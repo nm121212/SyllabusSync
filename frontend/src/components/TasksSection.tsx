@@ -5,6 +5,11 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
   IconButton,
   InputAdornment,
   Menu,
@@ -20,6 +25,7 @@ import {
   CloudDone,
   CloudSync,
   DeleteOutline,
+  EditOutlined,
   MoreHoriz,
   Search,
 } from '@mui/icons-material';
@@ -42,6 +48,7 @@ interface BackendTask {
   dueDate: string;
   status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   googleEventId?: string;
+  description?: string;
 }
 
 const TYPE_TO_LABEL: Record<string, { label: string; color: string }> = {
@@ -55,6 +62,23 @@ const TYPE_TO_LABEL: Record<string, { label: string; color: string }> = {
   DISCUSSION: { label: 'Discussion', color: '#60a5fa' },
   OTHER: { label: 'Task', color: '#7c6cff' },
 };
+
+const EDIT_TYPE_OPTIONS = [
+  { label: 'Task', value: 'OTHER' },
+  { label: 'Meeting', value: 'PRESENTATION' },
+  { label: 'Deadline', value: 'ASSIGNMENT' },
+  { label: 'Exam / test', value: 'EXAM' },
+  { label: 'Quiz', value: 'QUIZ' },
+  { label: 'Project', value: 'PROJECT' },
+  { label: 'Lab', value: 'LAB' },
+  { label: 'Paper', value: 'PAPER' },
+];
+
+const EDIT_PRIORITY_OPTIONS = [
+  { label: 'Low', value: 'LOW' },
+  { label: 'Medium', value: 'MEDIUM' },
+  { label: 'High', value: 'HIGH' },
+];
 
 const formatDue = (iso: string): string => {
   if (!iso) return '';
@@ -80,8 +104,15 @@ const isOverdue = (t: BackendTask): boolean => {
 };
 
 type TaskFilter = 'all' | 'open' | 'done';
+type EditFormState = {
+  title: string;
+  description: string;
+  dueDate: string;
+  type: string;
+  priority: string;
+};
 
-const TasksSection: React.FC = () => {
+const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { version, bumpVersion, openAddTask } = useTasks();
   const [tasks, setTasks] = useState<BackendTask[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +134,15 @@ const TasksSection: React.FC = () => {
     null | 'clearCompleted' | 'deleteAll'
   >(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<EditFormState>({
+    title: '',
+    description: '',
+    dueDate: '',
+    type: 'OTHER',
+    priority: 'MEDIUM',
+  });
+  const [editBusy, setEditBusy] = useState(false);
 
   /* Fetch on mount + whenever the shared version bumps */
   useEffect(() => {
@@ -156,6 +196,66 @@ const TasksSection: React.FC = () => {
       else next.delete(id);
       return next;
     });
+
+  const openEdit = (t: BackendTask) => {
+    setMenuAnchor(null);
+    setConfirmDeleteId(null);
+    setError(null);
+    setEditingTaskId(t.id);
+    setEditForm({
+      title: t.title ?? '',
+      description: t.description ?? '',
+      dueDate: t.dueDate ?? '',
+      type: t.type ?? 'OTHER',
+      priority: t.priority ?? 'MEDIUM',
+    });
+  };
+
+  const closeEdit = () => {
+    if (editBusy) return;
+    setEditingTaskId(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editingTaskId) return;
+    if (!editForm.title.trim()) {
+      setError('Task title cannot be empty.');
+      return;
+    }
+    if (!editForm.dueDate) {
+      setError('Due date is required.');
+      return;
+    }
+
+    setEditBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/syllabus/tasks/${editingTaskId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: editForm.title.trim(),
+            description: editForm.description.trim(),
+            dueDate: editForm.dueDate,
+            type: editForm.type,
+            priority: editForm.priority,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || 'Could not save task edits.');
+      }
+      setEditingTaskId(null);
+      bumpVersion();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong.');
+    } finally {
+      setEditBusy(false);
+    }
+  };
 
   const toggleComplete = async (t: BackendTask) => {
     setPending(t.id, true);
@@ -279,11 +379,12 @@ const TasksSection: React.FC = () => {
     <Box
       sx={{
         position: 'relative',
-        borderRadius: 4,
-        border: '1px solid rgba(139, 92, 246, 0.22)',
-        background:
-          'linear-gradient(180deg, rgba(26,23,51,0.75) 0%, rgba(20,17,39,0.45) 100%)',
-        backdropFilter: 'blur(10px)',
+        borderRadius: embedded ? 0 : 4,
+        border: embedded ? 'none' : '1px solid rgba(139, 92, 246, 0.22)',
+        background: embedded
+          ? 'transparent'
+          : 'linear-gradient(180deg, rgba(26,23,51,0.75) 0%, rgba(20,17,39,0.45) 100%)',
+        backdropFilter: embedded ? 'none' : 'blur(10px)',
         overflow: 'hidden',
       }}
     >
@@ -549,7 +650,7 @@ const TasksSection: React.FC = () => {
       {/* List */}
       <Box
         sx={{
-          maxHeight: 520,
+          maxHeight: embedded ? 640 : 520,
           overflowY: 'auto',
           py: loading ? 0 : 0.5,
         }}
@@ -775,6 +876,15 @@ const TasksSection: React.FC = () => {
         {menuAnchor &&
           sorted.find((t) => t.id === menuAnchor.taskId) && (
             <Box>
+              <MenuItem
+                onClick={() => {
+                  const t = sorted.find((x) => x.id === menuAnchor.taskId);
+                  if (t) openEdit(t);
+                }}
+              >
+                <EditOutlined sx={{ fontSize: 18, mr: 1.25 }} />
+                Edit task
+              </MenuItem>
               {!sorted.find((t) => t.id === menuAnchor.taskId)
                 ?.googleEventId && (
                 <MenuItem
@@ -830,6 +940,104 @@ const TasksSection: React.FC = () => {
             </Box>
           )}
       </Menu>
+
+      <Dialog
+        open={editingTaskId !== null}
+        onClose={closeEdit}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit task</DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={2} sx={{ mt: 0.1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Title"
+                value={editForm.title}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, title: e.target.value }))
+                }
+                disabled={editBusy}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                maxRows={4}
+                label="Notes"
+                value={editForm.description}
+                onChange={(e) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                disabled={editBusy}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                type="date"
+                label="Due date"
+                InputLabelProps={{ shrink: true }}
+                value={editForm.dueDate}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, dueDate: e.target.value }))
+                }
+                disabled={editBusy}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Priority"
+                value={editForm.priority}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, priority: e.target.value }))
+                }
+                disabled={editBusy}
+              >
+                {EDIT_PRIORITY_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                fullWidth
+                label="Type"
+                value={editForm.type}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, type: e.target.value }))
+                }
+                disabled={editBusy}
+              >
+                {EDIT_TYPE_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEdit} disabled={editBusy}>
+            Cancel
+          </Button>
+          <Button onClick={saveEdit} variant="contained" disabled={editBusy}>
+            {editBusy ? 'Saving…' : 'Save changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
