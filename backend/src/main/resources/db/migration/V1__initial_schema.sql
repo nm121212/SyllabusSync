@@ -1,7 +1,7 @@
 -- Baseline schema for PostgreSQL (Supabase, Docker Postgres, etc.).
 -- Enum columns use JPA @Enumerated(EnumType.STRING) — stored as enum constant names (e.g. ASSIGNMENT, PENDING).
 
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     supabase_sub VARCHAR(128) NOT NULL UNIQUE,
     first_name VARCHAR(100),
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS courses (
+CREATE TABLE courses (
     id BIGSERIAL PRIMARY KEY,
     course_code VARCHAR(20) NOT NULL,
     course_name VARCHAR(200) NOT NULL,
@@ -32,9 +32,9 @@ CREATE TABLE IF NOT EXISTS courses (
     CONSTRAINT uq_courses_user_course_name UNIQUE (user_id, course_name)
 );
 
-CREATE INDEX IF NOT EXISTS idx_courses_user_id ON courses (user_id);
+CREATE INDEX idx_courses_user_id ON courses (user_id);
 
-CREATE TABLE IF NOT EXISTS tasks (
+CREATE TABLE tasks (
     id BIGSERIAL PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
     description VARCHAR(1000),
@@ -52,10 +52,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     course_id BIGINT NOT NULL REFERENCES courses (id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks (user_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_course_id ON tasks (course_id);
+CREATE INDEX idx_tasks_user_id ON tasks (user_id);
+CREATE INDEX idx_tasks_course_id ON tasks (course_id);
 
-CREATE TABLE IF NOT EXISTS reminders (
+CREATE TABLE reminders (
     id BIGSERIAL PRIMARY KEY,
     reminder_date TIMESTAMP NOT NULL,
     status VARCHAR(50) NOT NULL,
@@ -66,4 +66,4 @@ CREATE TABLE IF NOT EXISTS reminders (
     task_id BIGINT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_reminders_task_id ON reminders (task_id);
+CREATE INDEX idx_reminders_task_id ON reminders (task_id);
