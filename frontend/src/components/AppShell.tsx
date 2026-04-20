@@ -16,7 +16,6 @@ import {
   Menu as MenuIcon,
   Close as CloseIcon,
   HomeOutlined,
-  ChatBubbleOutline,
   CalendarMonth,
   TaskAltOutlined,
   CloudUploadOutlined,
@@ -28,6 +27,7 @@ import { useTasks } from '../contexts/TasksContext.tsx';
 import AddTaskDialog from './AddTaskDialog.tsx';
 import { API_BASE_URL } from '../config/api.ts';
 import UserMenu from './UserMenu.tsx';
+import PulseChatIcon from './icons/PulseChatIcon.tsx';
 
 /**
  * App chrome: a fixed left sidebar with quick nav + a thin top bar with
@@ -47,7 +47,7 @@ type NavItem = {
 
 const primaryNav: NavItem[] = [
   { label: 'Today', to: '/#today', icon: <HomeOutlined /> },
-  { label: 'Chat', to: '/#chat', icon: <ChatBubbleOutline /> },
+  { label: 'Chat', to: '/#chat', icon: <PulseChatIcon sx={{ fontSize: 22 }} /> },
   { label: 'Tasks', to: '/#tasks', icon: <TaskAltOutlined /> },
   { label: 'Calendar', to: '/#calendar', icon: <CalendarMonth /> },
   { label: 'Capture', to: '/#capture', icon: <CloudUploadOutlined /> },

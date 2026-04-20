@@ -12,7 +12,6 @@ import {
   CalendarMonth,
   SmartToy,
   ArrowForward,
-  ChatBubbleOutline,
   TaskAlt,
   InsertDriveFileOutlined,
 } from '@mui/icons-material';
@@ -34,6 +33,7 @@ import GoogleSignInButton from '../components/GoogleSignInButton.tsx';
 import EditTaskDialog, {
   type EditableTask,
 } from '../components/EditTaskDialog.tsx';
+import PulseChatIcon from '../components/icons/PulseChatIcon.tsx';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Decorative concentric-wave blob (pure SVG)
@@ -664,8 +664,8 @@ const LandingPage: React.FC = () => {
                   boxShadow: '0 20px 40px -24px rgba(124,108,255,0.5)',
                 }}
               >
-                <ChatBubbleOutline
-                  sx={{ color: '#a08fff', fontSize: 20, flexShrink: 0 }}
+                <PulseChatIcon
+                  sx={{ fontSize: 22, flexShrink: 0 }}
                 />
                 <Box
                   component="input"
