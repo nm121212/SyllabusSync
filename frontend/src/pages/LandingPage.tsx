@@ -10,7 +10,6 @@ import {
   InsertDriveFileOutlined,
 } from '@mui/icons-material';
 import TaskCalendar, { CalendarTask } from '../components/TaskCalendar.tsx';
-import ChatPanel, { ChatMessage } from '../components/ChatPanel.tsx';
 import TasksSection from '../components/TasksSection.tsx';
 import {
   Card,
@@ -21,6 +20,7 @@ import {
 } from '../components/ui/card.tsx';
 import UploadSyllabus from './UploadSyllabus.tsx';
 import { useTasks } from '../contexts/TasksContext.tsx';
+import { useFloatingChat } from '../contexts/FloatingChatContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import GoogleSignInButton from '../components/GoogleSignInButton.tsx';
@@ -467,6 +467,7 @@ const calendarTaskToEditable = (t: CalendarTask): EditableTask | null => {
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { version, bumpVersion } = useTasks();
+  const { setPendingPrompt, openDock } = useFloatingChat();
   const stats = useLiveStats(version);
   const { session } = useAuth();
   const [calendarEditTask, setCalendarEditTask] = useState<EditableTask | null>(
@@ -477,11 +478,6 @@ const LandingPage: React.FC = () => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  /** A prompt typed in the hero that we forward to the chat panel. Each
-   *  submission gets a fresh id so repeated submissions still trigger a send. */
-  const [pendingPrompt, setPendingPrompt] = useState<
-    { text: string; id: string } | undefined
-  >(undefined);
   const [heroInput, setHeroInput] = useState('');
 
   const submitHero = (raw?: string) => {
@@ -489,24 +485,25 @@ const LandingPage: React.FC = () => {
     if (!text) return;
     setPendingPrompt({ text, id: `hero-${Date.now()}` });
     setHeroInput('');
-    setTimeout(() => scrollToId('chat'), 40);
+    openDock();
   };
 
-  /* The chat panel starts with a single friendly greeting; the pendingPrompt
-   * above is what actually drives the first real user turn. */
-  const initialChatMessages: ChatMessage[] = useMemo(
-    () => [
-      {
-        id: 'greet',
-        text:
-          "Hi - I’m Cadence. Tell me what’s on your mind and I’ll slot it into your day. " +
-          "Try: ‘Remind me to call Alex tomorrow at 6pm’, ‘Block 90 minutes for deep work Thursday morning’, or ‘What’s on my plate this week?’",
-        sender: 'bot',
-        timestamp: new Date(),
-      },
-    ],
-    []
-  );
+  const rescheduleTaskToDay = async (taskId: number, isoDay: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/syllabus/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueDate: isoDay }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || 'Could not move task');
+      }
+      bumpVersion();
+    } catch {
+      /* non-blocking; list/calendar stay unchanged */
+    }
+  };
 
   /* Hero card upcoming rows - strictly real tasks. When there are none we
      render a single "nothing yet" row rather than lying about fake
@@ -959,7 +956,10 @@ const LandingPage: React.FC = () => {
                 ]}
                 accent="#7c6cff"
                 cta="Open chat"
-                onClick={() => scrollToId('chat')}
+                onClick={() => {
+                  openDock();
+                  scrollToId('chat');
+                }}
               />
             </Grid>
             <Grid item xs={12} md={3}>
@@ -1011,11 +1011,11 @@ const LandingPage: React.FC = () => {
         </Container>
       </Box>
 
-      {/* CHAT ──────────────────────────────────────────────────────────── */}
+      {/* CHAT — floating panel (FAB / dock); this section keeps hash nav + copy */}
       <Box
         component="section"
         id="chat"
-        sx={{ py: { xs: 7, md: 10 }, position: 'relative' }}
+        sx={{ py: { xs: 5, md: 7 }, position: 'relative', scrollMarginTop: 96 }}
       >
         <Container maxWidth="lg">
           <SectionHeader
@@ -1025,21 +1025,29 @@ const LandingPage: React.FC = () => {
                 Talk. It&rsquo;ll handle <br /> the scheduling.
               </>
             }
-            subtitle="No menus, no forms. Just say what you need. Cadence figures out the date, the time, the type, and puts it on your Google Calendar."
+            subtitle="Cadence lives in a draggable panel on the side—open it anytime from the pulse button or the Chat item in the sidebar. Your hero prompt and nav land there automatically."
           />
-          <Box sx={{ mt: { xs: 4, md: 6 }, maxWidth: 980, mx: 'auto' }}>
-            <ChatPanel
-              height={640}
-              initialMessages={initialChatMessages}
-              pendingPrompt={pendingPrompt}
-              onReply={() => bumpVersion()}
-              suggestions={[
-                'Plan my week',
-                'Remind me to pay rent on the 1st',
-                'Block focus time tomorrow 9–11am',
-                'What\u2019s due this week?',
-              ]}
-            />
+          <Box
+            sx={{
+              mt: { xs: 3, md: 4 },
+              maxWidth: 560,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 1.5,
+              alignItems: 'center',
+            }}
+          >
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<SmartToy />}
+              onClick={() => openDock()}
+            >
+              Open Cadence chat
+            </Button>
+            <Typography sx={{ fontSize: 13, color: 'var(--ss-text-mute)' }}>
+              Tip: drag tasks from the list onto a calendar day to reschedule.
+            </Typography>
           </Box>
         </Container>
       </Box>
@@ -1101,7 +1109,7 @@ const LandingPage: React.FC = () => {
                     <CardHeader>
                       <CardTitle>Your month</CardTitle>
                       <CardDescription>
-                        Drag your eyes across the month and spot due dates instantly.
+                        Drag a task from the list onto any day to change its due date.
                       </CardDescription>
                     </CardHeader>
                     <CardContent sx={{ pt: 0 }}>
@@ -1113,6 +1121,7 @@ const LandingPage: React.FC = () => {
                           const e = calendarTaskToEditable(t);
                           if (e) setCalendarEditTask(e);
                         }}
+                        onTaskDroppedOnDay={rescheduleTaskToDay}
                       />
                     </CardContent>
                   </Grid>

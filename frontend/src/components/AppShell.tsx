@@ -25,6 +25,7 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { useTasks } from '../contexts/TasksContext.tsx';
+import { useFloatingChat } from '../contexts/FloatingChatContext.tsx';
 import AddTaskDialog from './AddTaskDialog.tsx';
 import { API_BASE_URL } from '../config/api.ts';
 import UserMenu from './UserMenu.tsx';
@@ -536,6 +537,7 @@ const TopBar: React.FC<{
 /* ──────────────────────────────────────────────────────────────────────── */
 const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
+  const { openDock } = useFloatingChat();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeHash, setActiveHash] = useState<string>('today');
@@ -578,6 +580,9 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (location.pathname !== '/') return;
     const id = window.location.hash.replace('#', '');
     if (!id) return;
+    if (id === 'chat') {
+      openDock();
+    }
     const el = document.getElementById(id);
     if (!el) return;
     // Small delay so the section is laid out before we scroll.
@@ -586,12 +591,15 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       80
     );
     return () => window.clearTimeout(t);
-  }, [location.pathname]);
+  }, [location.pathname, openDock]);
 
   const handleNavigate = (item: NavItem) => {
     setMobileOpen(false);
     if (item.to.startsWith('/#')) {
       const id = item.to.slice(2);
+      if (id === 'chat') {
+        openDock();
+      }
       /* Keep the URL hash in sync with the landing section so refresh /
          share-URL preserves the user's scroll position. We don't use
          react-router's navigate for the hash because it re-renders; a

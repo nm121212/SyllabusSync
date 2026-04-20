@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   IconButton,
@@ -8,6 +8,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import { ChevronLeft, ChevronRight, CheckCircle } from '@mui/icons-material';
+import { CADENCE_TASK_DRAG_TYPE } from '../lib/cadenceDrag.ts';
 
 export interface CalendarTask {
   id: number | string;
@@ -29,6 +30,8 @@ interface TaskCalendarProps {
   framed?: boolean;
   /** When set, task chips are clickable to edit (e.g. open the same dialog as the task list). */
   onTaskClick?: (task: CalendarTask) => void;
+  /** Drop a task from the list onto a day to reschedule its due date (yyyy-mm-dd). */
+  onTaskDroppedOnDay?: (taskId: number, isoDay: string) => void;
 }
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -78,8 +81,10 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
   variant = 'full',
   framed = true,
   onTaskClick,
+  onTaskDroppedOnDay,
 }) => {
   const compact = variant === 'compact';
+  const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const [moreMenu, setMoreMenu] = useState<{
     anchor: HTMLElement;
     dayTasks: CalendarTask[];
@@ -137,6 +142,13 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
 
   const cellSize = compact ? 42 : 72;
   const chipFontSize = compact ? 9 : 11;
+
+  useEffect(() => {
+    if (!dropTargetKey || !onTaskDroppedOnDay) return;
+    const clear = () => setDropTargetKey(null);
+    window.addEventListener('dragend', clear);
+    return () => window.removeEventListener('dragend', clear);
+  }, [dropTargetKey, onTaskDroppedOnDay]);
 
   return (
     <Box
@@ -271,28 +283,66 @@ const TaskCalendar: React.FC<TaskCalendarProps> = ({
         {cells.map((cell, idx) => {
           const inMonth = cell.getMonth() === month.getMonth();
           const isToday = isSameDay(cell, today);
-          const dayTasks = tasksByDay.get(formatIsoKey(cell)) ?? [];
+          const isoKey = formatIsoKey(cell);
+          const dayTasks = tasksByDay.get(isoKey) ?? [];
           const hasTasks = dayTasks.length > 0;
+          const isDropTarget =
+            Boolean(onTaskDroppedOnDay) && dropTargetKey === isoKey;
 
           return (
             <Box
               key={idx}
+              onDragOver={
+                onTaskDroppedOnDay
+                  ? (e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDropTargetKey(isoKey);
+                    }
+                  : undefined
+              }
+              onDrop={
+                onTaskDroppedOnDay
+                  ? (e) => {
+                      e.preventDefault();
+                      setDropTargetKey(null);
+                      const raw =
+                        e.dataTransfer.getData(CADENCE_TASK_DRAG_TYPE) ||
+                        e.dataTransfer.getData('text/plain');
+                      const taskId = parseInt(raw, 10);
+                      if (Number.isNaN(taskId)) return;
+                      onTaskDroppedOnDay(taskId, isoKey);
+                      if (
+                        cell.getMonth() !== month.getMonth() ||
+                        cell.getFullYear() !== month.getFullYear()
+                      ) {
+                        setMonth(startOfMonth(cell));
+                      }
+                    }
+                  : undefined
+              }
               sx={{
                 position: 'relative',
                 minHeight: cellSize,
                 p: compact ? 0.75 : 1,
                 borderRadius: 2,
-                border: isToday
-                  ? '1px solid rgba(124, 108, 255, 0.85)'
-                  : '1px solid rgba(139, 92, 246, 0.12)',
-                background: isToday
-                  ? 'rgba(124, 108, 255, 0.14)'
-                  : hasTasks
-                    ? 'rgba(10, 9, 20, 0.55)'
-                    : 'rgba(10, 9, 20, 0.3)',
-                boxShadow: isToday
-                  ? '0 8px 24px -10px rgba(124,108,255,0.7)'
-                  : 'none',
+                border: isDropTarget
+                  ? '1px solid rgba(34, 211, 238, 0.9)'
+                  : isToday
+                    ? '1px solid rgba(124, 108, 255, 0.85)'
+                    : '1px solid rgba(139, 92, 246, 0.12)',
+                background: isDropTarget
+                  ? 'rgba(34, 211, 238, 0.12)'
+                  : isToday
+                    ? 'rgba(124, 108, 255, 0.14)'
+                    : hasTasks
+                      ? 'rgba(10, 9, 20, 0.55)'
+                      : 'rgba(10, 9, 20, 0.3)',
+                boxShadow: isDropTarget
+                  ? '0 0 0 2px rgba(34, 211, 238, 0.35)'
+                  : isToday
+                    ? '0 8px 24px -10px rgba(124,108,255,0.7)'
+                    : 'none',
                 opacity: inMonth ? 1 : 0.35,
                 transition:
                   'transform 160ms ease, border-color 160ms ease, background 160ms ease',

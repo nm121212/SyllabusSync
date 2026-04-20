@@ -8,6 +8,8 @@ import LandingPage from './pages/LandingPage.tsx';
 import CalendarSync from './pages/CalendarSync.tsx';
 import { UploadProvider } from './contexts/UploadContext.tsx';
 import { TasksProvider } from './contexts/TasksContext.tsx';
+import { FloatingChatProvider } from './contexts/FloatingChatContext.tsx';
+import FloatingChatDock from './components/FloatingChatDock.tsx';
 
 const theme = createTheme({
   palette: {
@@ -196,32 +198,35 @@ const App: React.FC = () => {
       <CssBaseline />
       <UploadProvider>
         <TasksProvider>
-          <Router>
-            <Box className="ss-app-bg">
-              <AppShell>
-                <Routes>
-                  {/* Everything lives on the landing page except Settings
-                      (Google Calendar connection + sync controls), which
-                      stays as its own discrete surface. */}
-                  <Route path="/" element={<LandingPage />} />
-                  <Route
-                    path="/settings"
-                    element={
-                      <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
-                        <CalendarSync />
-                      </Container>
-                    }
-                  />
-                  {/* Back-compat: old deep links redirect to the landing */}
-                  <Route path="/dashboard" element={<Navigate to="/" replace />} />
-                  <Route path="/upload" element={<Navigate to="/#capture" replace />} />
-                  <Route path="/chatbot" element={<Navigate to="/#chat" replace />} />
-                  <Route path="/calendar" element={<Navigate to="/settings" replace />} />
-                </Routes>
-              </AppShell>
-              <UploadStatusBar />
-            </Box>
-          </Router>
+          <FloatingChatProvider>
+            <Router>
+              <Box className="ss-app-bg">
+                <AppShell>
+                  <Routes>
+                    {/* Everything lives on the landing page except Settings
+                        (Google Calendar connection + sync controls), which
+                        stays as its own discrete surface. */}
+                    <Route path="/" element={<LandingPage />} />
+                    <Route
+                      path="/settings"
+                      element={
+                        <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
+                          <CalendarSync />
+                        </Container>
+                      }
+                    />
+                    {/* Back-compat: old deep links redirect to the landing */}
+                    <Route path="/dashboard" element={<Navigate to="/" replace />} />
+                    <Route path="/upload" element={<Navigate to="/#capture" replace />} />
+                    <Route path="/chatbot" element={<Navigate to="/#chat" replace />} />
+                    <Route path="/calendar" element={<Navigate to="/settings" replace />} />
+                  </Routes>
+                </AppShell>
+                <FloatingChatDock />
+                <UploadStatusBar />
+              </Box>
+            </Router>
+          </FloatingChatProvider>
         </TasksProvider>
       </UploadProvider>
     </ThemeProvider>

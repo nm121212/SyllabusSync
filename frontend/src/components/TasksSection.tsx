@@ -20,12 +20,14 @@ import {
   CloudDone,
   CloudSync,
   DeleteOutline,
+  DragIndicator,
   EditOutlined,
   MoreHoriz,
   Search,
 } from '@mui/icons-material';
 import { useTasks } from '../contexts/TasksContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import { CADENCE_TASK_DRAG_TYPE } from '../lib/cadenceDrag.ts';
 import EditTaskDialog from './EditTaskDialog.tsx';
 
 /**
@@ -680,6 +682,31 @@ const TasksSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                       <CheckCircleOutline sx={{ fontSize: 22 }} />
                     )}
                   </IconButton>
+                </Tooltip>
+
+                <Tooltip title="Drag onto a calendar day to reschedule">
+                  <Box
+                    draggable={!isPending}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        CADENCE_TASK_DRAG_TYPE,
+                        String(t.id)
+                      );
+                      e.dataTransfer.setData('text/plain', String(t.id));
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    sx={{
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: 'rgba(255,255,255,0.35)',
+                      cursor: isPending ? 'default' : 'grab',
+                      '&:active': { cursor: isPending ? 'default' : 'grabbing' },
+                      flexShrink: 0,
+                    }}
+                    aria-hidden
+                  >
+                    <DragIndicator sx={{ fontSize: 20 }} />
+                  </Box>
                 </Tooltip>
 
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
