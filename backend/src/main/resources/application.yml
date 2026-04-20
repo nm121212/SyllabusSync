@@ -51,6 +51,13 @@ google:
   client-id: ${GOOGLE_CLIENT_ID}
   client-secret: ${GOOGLE_CLIENT_SECRET}
   redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/api/syllabus/auth/google/callback}
+
+# Supabase — the source of truth for user identity. The backend verifies
+# Supabase-issued JWTs using the project's JWT secret (HS256). Set
+# SUPABASE_JWT_SECRET from Supabase Dashboard → Settings → API → JWT Secret.
+supabase:
+  url: ${SUPABASE_URL:}
+  jwt-secret: ${SUPABASE_JWT_SECRET:}
   
   # Gemini: use Vertex AI (GCP credits) when GOOGLE_CLOUD_PROJECT is set; else consumer API with GEMINI_API_KEY
   gemini:
@@ -143,11 +150,29 @@ app:
     max-size: ${MAX_FILE_SIZE:10MB}
     allowed-types: pdf,docx,txt
   
+  auth:
+    # When true, every request must carry a valid Supabase JWT in the
+    # Authorization header (see SupabaseJwtFilter). Production should flip
+    # this on once SUPABASE_JWT_SECRET is set.
+    required: ${APP_AUTH_REQUIRED:false}
+
+  cors:
+    # CSV list of allowed origins. Default "*" is convenient locally but
+    # production should lock this down to the Vercel + preview hostnames.
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:*}
+
+  oauth:
+    # Fallback secret used to sign the Google OAuth `state` param when no
+    # Supabase JWT secret is configured (dev only). In production we reuse
+    # SUPABASE_JWT_SECRET so there's nothing extra to rotate.
+    state-secret: ${APP_OAUTH_STATE_SECRET:syllabussync-local-oauth-state-secret-change-me-please-1234567890}
+
   google:
     calendar:
       timezone: America/New_York
-      # Browser redirect after Google OAuth (Calendar page in the React app)
-      oauth-success-redirect: ${CALENDAR_OAUTH_SUCCESS_URL:http://localhost:3000/calendar}
+      # Browser redirect after Google OAuth - now lands on the Settings
+      # page so the signed-in user sees the freshly-connected state.
+      oauth-success-redirect: ${CALENDAR_OAUTH_SUCCESS_URL:http://localhost:3000/settings}
       default-reminders:
         - days: 7
         - days: 3

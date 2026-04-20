@@ -15,6 +15,8 @@ import TasksSection from '../components/TasksSection.tsx';
 import UploadSyllabus from './UploadSyllabus.tsx';
 import { useTasks } from '../contexts/TasksContext.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import GoogleSignInButton from '../components/GoogleSignInButton.tsx';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Decorative concentric-wave blob (pure SVG)
@@ -433,6 +435,7 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { version, bumpVersion } = useTasks();
   const stats = useLiveStats(version);
+  const { session } = useAuth();
 
   const scrollToId = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -559,6 +562,28 @@ const LandingPage: React.FC = () => {
                 done - reminders, focus blocks, errands, meetings - and it lands
                 on your calendar.
               </Typography>
+
+              {/* Primary sign-up CTA — shown only when signed out. Once
+                  the user authenticates we collapse this row so the page
+                  doesn't keep pushing them to sign in. */}
+              {!session && (
+                <Box
+                  sx={{
+                    mt: 3.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <GoogleSignInButton label="Sign up with Google" />
+                  <Typography
+                    sx={{ fontSize: 13, color: 'var(--ss-text-mute)' }}
+                  >
+                    Free during beta &middot; one click &middot; no credit card
+                  </Typography>
+                </Box>
+              )}
 
               {/* Inline chat prompt – submits straight into the chat section */}
               <Box

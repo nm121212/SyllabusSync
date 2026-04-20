@@ -52,6 +52,9 @@ public class GoogleConfig {
         return JSON_FACTORY;
     }
 
+    @Value("${app.google.credentials-dir:}")
+    private String credentialsDir;
+
     @Bean
     public GoogleAuthorizationCodeFlow googleAuthFlow(NetHttpTransport httpTransport) throws IOException {
         GoogleClientSecrets.Details details = new GoogleClientSecrets.Details();
@@ -61,8 +64,20 @@ public class GoogleConfig {
         GoogleClientSecrets clientSecrets = new GoogleClientSecrets();
         clientSecrets.setWeb(details);
 
-        // Create a directory for storing credentials
-        File dataStoreDir = new File(System.getProperty("user.home"), ".credentials/syllabussync");
+        // Each user's tokens land in this directory, keyed by the Supabase
+        // `sub`. Configurable via APP_GOOGLE_CREDENTIALS_DIR so Render can
+        // pin it next to the tasks data volume; defaults to a subdirectory
+        // of the user's home so dev + containers still work unchanged.
+        File dataStoreDir = (credentialsDir != null && !credentialsDir.isBlank())
+                ? new File(credentialsDir)
+                : new File(System.getProperty("user.home"), ".credentials/syllabussync");
+        if (!dataStoreDir.exists() && !dataStoreDir.mkdirs()) {
+            // mkdir failure isn't fatal — the FileDataStoreFactory will
+            // surface a more specific error when it actually tries to
+            // write — but log so Render deploys surface misconfigurations
+            // loudly.
+            System.err.println("WARN: could not create credentials dir: " + dataStoreDir.getAbsolutePath());
+        }
         FileDataStoreFactory dataStoreFactory = new FileDataStoreFactory(dataStoreDir);
 
         return new GoogleAuthorizationCodeFlow.Builder(

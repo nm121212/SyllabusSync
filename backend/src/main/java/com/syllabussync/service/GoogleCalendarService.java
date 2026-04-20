@@ -39,6 +39,19 @@ public class GoogleCalendarService {
                 .build();
     }
 
+    /**
+     * Variant that embeds a signed {@code state} param so the Google callback
+     * can identify which user just authorised. Without this, every callback
+     * would fall back to the legacy shared "default-user" bucket — which is
+     * exactly the cross-user leak we're removing.
+     */
+    public String getAuthorizationUrl(String signedState) {
+        return googleAuthFlow.newAuthorizationUrl()
+                .setRedirectUri(redirectUri)
+                .setState(signedState)
+                .build();
+    }
+
     public String handleCallback(String code, String userId) throws IOException {
         var tokenResponse = googleAuthFlow.newTokenRequest(code)
                 .setRedirectUri(redirectUri)

@@ -44,7 +44,7 @@ public class ChatBotService {
         return PromptDateTimeHelper.safeZone(calendarTimezone);
     }
 
-    public Map<String, Object> processMessage(String message) {
+    public Map<String, Object> processMessage(String userId, String message) {
         try {
             if (!generativeAiClient.isConfigured()) {
                 return Map.of(
@@ -52,8 +52,9 @@ public class ChatBotService {
                         "AI is not configured. Set GOOGLE_CLOUD_PROJECT and Application Default Credentials "
                                 + "for Vertex AI, or set GEMINI_API_KEY for the Gemini API.");
             }
-            // Get current tasks to provide context to the AI
-            List<Task> currentTasks = taskService.getAllTasks();
+            // Pull only the signed-in user's tasks for context so the AI never
+            // advises one user using another user's calendar.
+            List<Task> currentTasks = taskService.getAllTasks(userId);
             
             // Send message to Gemini AI with task context
             String geminiResponse = callGeminiAPI(message, currentTasks);
@@ -67,18 +68,18 @@ public class ChatBotService {
                 Map<String, Object> taskData = (Map<String, Object>) parsedResponse.get("taskCreated");
                 Task createdTask = createTaskFromData(taskData);
                 if (createdTask != null) {
-                    taskService.saveTask(createdTask);
+                    taskService.saveTask(userId, createdTask);
                     
-                    // Try to sync to Google Calendar (use default user ID for now)
+                    // Try to sync to the signed-in user's Google Calendar.
                     try {
-                        String eventId = googleCalendarService.createCalendarEvent("default-user", Map.of(
+                        String eventId = googleCalendarService.createCalendarEvent(userId, Map.of(
                             "title", createdTask.getTitle(),
                             "courseName", createdTask.getCourse() != null ? createdTask.getCourse().getName() : "AI Assistant Tasks",
                             "type", createdTask.getType().toString(),
                             "dueDate", createdTask.getDueDate().toString()
                         ));
                         createdTask.setGoogleEventId(eventId);
-                        taskService.saveTask(createdTask); // Save again with Google Event ID
+                        taskService.saveTask(userId, createdTask); // Save again with Google Event ID
                     } catch (Exception e) {
                         System.err.println("Failed to sync task to Google Calendar: " + e.getMessage());
                         // Don't fail the entire operation if calendar sync fails

@@ -105,7 +105,12 @@ const CalendarSync: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/syllabus/auth/google/url`);
+      /* /api/auth/google/url is served by AuthController — it reads the
+         current Supabase user from the JWT (via our fetch interceptor)
+         and returns an authUrl whose `state` param is a signed JWT
+         carrying that user id. The legacy `/syllabus/auth/google/url`
+         endpoint was removed in the per-user refactor. */
+      const response = await fetch(`${API_BASE_URL}/auth/google/url`);
       const data = await response.json();
       if (data.authUrl) {
         window.location.href = data.authUrl;

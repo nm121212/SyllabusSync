@@ -27,6 +27,7 @@ import {
 import { useTasks } from '../contexts/TasksContext.tsx';
 import AddTaskDialog from './AddTaskDialog.tsx';
 import { API_BASE_URL } from '../config/api.ts';
+import UserMenu from './UserMenu.tsx';
 
 /**
  * App chrome: a fixed left sidebar with quick nav + a thin top bar with
@@ -526,6 +527,7 @@ const TopBar: React.FC<{
             New
           </Box>
         </Button>
+        <UserMenu />
       </Box>
     </Box>
   );

@@ -1,5 +1,6 @@
 package com.syllabussync.controller;
 
+import com.syllabussync.security.CurrentUserResolver;
 import com.syllabussync.service.ChatBotService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,15 +9,19 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 /**
- * Controller for handling chatbot interactions
+ * Chatbot endpoints. Every request is scoped to the signed-in Supabase user
+ * so the AI sees only that user's tasks and writes new tasks/events into
+ * their calendar — no more shared "default-user" context.
  */
 @RestController
 @RequestMapping("/api/chatbot")
-@CrossOrigin(origins = "http://localhost:3000")
 public class ChatBotController {
 
     @Autowired
     private ChatBotService chatBotService;
+
+    @Autowired
+    private CurrentUserResolver currentUserResolver;
 
     @PostMapping("/process")
     public ResponseEntity<Map<String, Object>> processMessage(@RequestBody Map<String, String> request) {
@@ -28,7 +33,8 @@ public class ChatBotController {
                 ));
             }
 
-            Map<String, Object> response = chatBotService.processMessage(message);
+            String userId = currentUserResolver.requireUserId();
+            Map<String, Object> response = chatBotService.processMessage(userId, message);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of(

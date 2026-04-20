@@ -1,5 +1,8 @@
 package com.syllabussync.controller;
 
+import com.syllabussync.security.CurrentUser;
+import com.syllabussync.security.CurrentUserResolver;
+import com.syllabussync.security.OAuthStateCodec;
 import com.syllabussync.service.IntelligentParsingService;
 import com.syllabussync.service.SyllabusParsingService;
 import com.syllabussync.service.GoogleCalendarService;
@@ -19,7 +22,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/syllabus")
-@CrossOrigin(origins = "*", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class SyllabusController {
 
     @Autowired
@@ -34,14 +36,22 @@ public class SyllabusController {
     @Autowired
     private TaskService taskService;
 
-    @Value("${app.google.calendar.oauth-success-redirect:http://localhost:3000/calendar}")
+    @Autowired
+    private CurrentUserResolver currentUserResolver;
+
+    @Autowired
+    private OAuthStateCodec oAuthStateCodec;
+
+    @Value("${app.google.calendar.oauth-success-redirect:http://localhost:3000/settings}")
     private String calendarOauthSuccessRedirect;
     
     // Google Calendar OAuth endpoints
     @GetMapping("/auth/google/url")
     public ResponseEntity<Map<String, Object>> getGoogleAuthUrl() {
         try {
-            String authUrl = googleCalendarService.getAuthorizationUrl();
+            String userId = currentUserResolver.requireUserId();
+            String state = oAuthStateCodec.encode(userId);
+            String authUrl = googleCalendarService.getAuthorizationUrl(state);
             return ResponseEntity.ok(Map.of("authUrl", authUrl));
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
@@ -52,6 +62,7 @@ public class SyllabusController {
     @GetMapping("/auth/google/callback")
     public ResponseEntity<Void> handleGoogleCallback(
             @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "state", required = false) String state,
             @RequestParam(value = "error", required = false) String oauthError,
             @RequestParam(value = "error_description", required = false) String errorDescription) {
         String base = calendarOauthSuccessRedirect;
@@ -68,7 +79,18 @@ public class SyllabusController {
                                 + URLEncoder.encode("missing authorization code", StandardCharsets.UTF_8)))
                         .build();
             }
-            googleCalendarService.handleCallback(code, "default-user");
+            // The user id is carried in the signed `state` param — we refuse to
+            // continue without it so we never write credentials under the wrong
+            // bucket (the previous shared "default-user" was the root-cause of
+            // the cross-user leak).
+            String userId = oAuthStateCodec.decode(state);
+            if (userId == null) {
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(URI.create(base + "?calendar_error="
+                                + URLEncoder.encode("Session expired - please sign in and try again.", StandardCharsets.UTF_8)))
+                        .build();
+            }
+            googleCalendarService.handleCallback(code, userId);
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(URI.create(base + "?calendar_connected=1"))
                     .build();
@@ -83,7 +105,11 @@ public class SyllabusController {
     @GetMapping("/calendar/status")
     public ResponseEntity<Map<String, Object>> getCalendarStatus() {
         try {
-            boolean isConnected = googleCalendarService.isUserConnected("default-user");
+            CurrentUser u = currentUserResolver.currentUserOrNull();
+            if (u == null) {
+                return ResponseEntity.ok(Map.of("connected", false));
+            }
+            boolean isConnected = googleCalendarService.isUserConnected(u.supabaseUserId());
             return ResponseEntity.ok(Map.of("connected", isConnected));
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
@@ -132,8 +158,11 @@ public class SyllabusController {
             String extractedCourseName = (String) parseResult.get("courseName");
             String finalCourseName = courseName != null ? courseName : extractedCourseName;
             
-            // Store the tasks in TaskService (no automatic calendar sync)
-            List<Task> savedTasks = taskService.createTasksFromParsedData(tasks, finalCourseName);
+            // Store the tasks in TaskService (no automatic calendar sync).
+            // Scoped to the authenticated Supabase user so different students
+            // never mix syllabi.
+            String userId = currentUserResolver.requireUserId();
+            List<Task> savedTasks = taskService.createTasksFromParsedData(userId, tasks, finalCourseName);
             
             Map<String, Object> response = new HashMap<>();
             response.put("fileName", file.getOriginalFilename());
@@ -163,22 +192,21 @@ public class SyllabusController {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> taskMaps = (List<Map<String, Object>>) request.get("tasks");
             String courseName = (String) request.get("courseName");
-            
-            // Check if Google Calendar is connected
-            if (!googleCalendarService.isUserConnected("default-user")) {
+            String userId = currentUserResolver.requireUserId();
+
+            if (!googleCalendarService.isUserConnected(userId)) {
                 return ResponseEntity.badRequest()
                     .body(Map.of("error", "Please connect your Google Calendar first"));
             }
-            
-            // Add course name to each task
+
             for (Map<String, Object> taskMap : taskMaps) {
                 taskMap.put("courseName", courseName);
             }
-            
+
             List<String> eventIds = new ArrayList<>();
             for (Map<String, Object> taskMap : taskMaps) {
                 try {
-                    String eventId = googleCalendarService.createCalendarEvent("default-user", taskMap);
+                    String eventId = googleCalendarService.createCalendarEvent(userId, taskMap);
                     eventIds.add(eventId);
                 } catch (IOException e) {
                     System.err.println("Failed to create calendar event: " + e.getMessage());
@@ -201,7 +229,14 @@ public class SyllabusController {
     @GetMapping("/tasks")
     public ResponseEntity<List<Map<String, Object>>> getAllTasks() {
         try {
-            List<Task> tasks = taskService.getAllTasks();
+            // When the caller isn't authenticated (e.g. the landing page hero
+            // probing for stats before sign-in) we return an empty list rather
+            // than 401ing so the UI can render its honest empty state.
+            CurrentUser u = currentUserResolver.currentUserOrNull();
+            if (u == null) {
+                return ResponseEntity.ok(List.of());
+            }
+            List<Task> tasks = taskService.getAllTasks(u.supabaseUserId());
             return ResponseEntity.ok(convertTasksToMap(tasks));
         } catch (Exception e) {
             System.err.println("Error getting tasks: " + e.getMessage());
@@ -215,7 +250,8 @@ public class SyllabusController {
             @PathVariable Long taskId,
             @RequestBody Map<String, Object> updates) {
         try {
-            Task updatedTask = taskService.updateTask(taskId, updates);
+            String userId = currentUserResolver.requireUserId();
+            Task updatedTask = taskService.updateTask(userId, taskId, updates);
 
             // NOTE: `Map.of(...)` is null-hostile and was throwing NPEs for
             // tasks without a description or a due date, which made every
@@ -260,7 +296,7 @@ public class SyllabusController {
     public ResponseEntity<Map<String, Object>> deleteTask(
             @PathVariable Long taskId) {
         try {
-            taskService.deleteTask(taskId);
+            taskService.deleteTask(currentUserResolver.requireUserId(), taskId);
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Task deleted successfully");
             return ResponseEntity.ok(response);
@@ -275,7 +311,7 @@ public class SyllabusController {
     @DeleteMapping("/tasks")
     public ResponseEntity<Map<String, Object>> deleteAllTasks() {
         try {
-            taskService.deleteAllTasks();
+            taskService.deleteAllTasks(currentUserResolver.requireUserId());
             Map<String, Object> response = new HashMap<>();
             response.put("message", "All tasks deleted successfully");
             return ResponseEntity.ok(response);
@@ -289,28 +325,28 @@ public class SyllabusController {
     @PostMapping("/tasks/{taskId}/sync-calendar")
     public ResponseEntity<Map<String, Object>> syncTaskToCalendar(@PathVariable Long taskId) {
         try {
-            List<Task> allTasks = taskService.getAllTasks();
+            String userId = currentUserResolver.requireUserId();
+            List<Task> allTasks = taskService.getAllTasks(userId);
             Task task = allTasks.stream()
                     .filter(t -> t.getId().equals(taskId))
                     .findFirst()
                     .orElse(null);
-            
+
             if (task == null) {
                 return ResponseEntity.notFound().build();
             }
-            
-            if (!googleCalendarService.isUserConnected("default-user")) {
+
+            if (!googleCalendarService.isUserConnected(userId)) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Google Calendar not connected. Please connect your calendar first."));
             }
-            
+
             String courseName = task.getCourse() != null ? task.getCourse().getCourseName() : "Unknown Course";
-            String eventId = googleCalendarService.createCalendarEventForTask("default-user", task, courseName);
-            
-            // Update task with Google Event ID
+            String eventId = googleCalendarService.createCalendarEventForTask(userId, task, courseName);
+
             Map<String, Object> updates = new HashMap<>();
             updates.put("googleEventId", eventId);
-            taskService.updateTask(taskId, updates);
+            taskService.updateTask(userId, taskId, updates);
             
             return ResponseEntity.ok(Map.of(
                 "message", "Task synced to Google Calendar successfully",
@@ -327,30 +363,29 @@ public class SyllabusController {
     @PostMapping("/tasks/sync-all-calendar")
     public ResponseEntity<Map<String, Object>> syncAllTasksToCalendar() {
         try {
-            if (!googleCalendarService.isUserConnected("default-user")) {
+            String userId = currentUserResolver.requireUserId();
+            if (!googleCalendarService.isUserConnected(userId)) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Google Calendar not connected. Please connect your calendar first."));
             }
-            
-            List<Task> allTasks = taskService.getAllTasks();
+
+            List<Task> allTasks = taskService.getAllTasks(userId);
             int syncedCount = 0;
             int failedCount = 0;
             List<String> errors = new ArrayList<>();
-            
+
             for (Task task : allTasks) {
                 try {
-                    // Skip if already synced
                     if (task.getGoogleEventId() != null && !task.getGoogleEventId().isEmpty()) {
                         continue;
                     }
-                    
+
                     String courseName = task.getCourse() != null ? task.getCourse().getCourseName() : "Unknown Course";
-                    String eventId = googleCalendarService.createCalendarEventForTask("default-user", task, courseName);
-                    
-                    // Update task with Google Event ID
+                    String eventId = googleCalendarService.createCalendarEventForTask(userId, task, courseName);
+
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("googleEventId", eventId);
-                    taskService.updateTask(task.getId(), updates);
+                    taskService.updateTask(userId, task.getId(), updates);
                     
                     syncedCount++;
                 } catch (Exception e) {
@@ -385,7 +420,8 @@ public class SyllabusController {
             List<Map<String, Object>> taskMaps = (List<Map<String, Object>>) request.get("tasks");
             String courseName = (String) request.get("courseName");
             
-            List<Task> savedTasks = taskService.createTasksFromParsedData(taskMaps, courseName);
+            String userId = currentUserResolver.requireUserId();
+            List<Task> savedTasks = taskService.createTasksFromParsedData(userId, taskMaps, courseName);
             
             return ResponseEntity.ok(Map.of(
                 "message", "Tasks saved successfully",
