@@ -1,7 +1,5 @@
 -- Baseline schema for PostgreSQL (Supabase, Docker Postgres, etc.).
 -- Enum columns use JPA @Enumerated(EnumType.STRING) — stored as enum constant names (e.g. ASSIGNMENT, PENDING).
--- DISABLE ROW LEVEL SECURITY is required on Supabase: the Spring Boot backend connects as the
--- postgres/service-role user and manages its own auth — PostgREST-style RLS policies are not used.
 
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
@@ -17,8 +15,6 @@ CREATE TABLE users (
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
-
-ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 
 CREATE TABLE courses (
     id BIGSERIAL PRIMARY KEY,
@@ -37,8 +33,6 @@ CREATE TABLE courses (
 );
 
 CREATE INDEX idx_courses_user_id ON courses (user_id);
-
-ALTER TABLE courses DISABLE ROW LEVEL SECURITY;
 
 CREATE TABLE tasks (
     id BIGSERIAL PRIMARY KEY,
@@ -61,8 +55,6 @@ CREATE TABLE tasks (
 CREATE INDEX idx_tasks_user_id ON tasks (user_id);
 CREATE INDEX idx_tasks_course_id ON tasks (course_id);
 
-ALTER TABLE tasks DISABLE ROW LEVEL SECURITY;
-
 CREATE TABLE reminders (
     id BIGSERIAL PRIMARY KEY,
     reminder_date TIMESTAMP NOT NULL,
@@ -75,5 +67,3 @@ CREATE TABLE reminders (
 );
 
 CREATE INDEX idx_reminders_task_id ON reminders (task_id);
-
-ALTER TABLE reminders DISABLE ROW LEVEL SECURITY;
