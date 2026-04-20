@@ -1,0 +1,5 @@
+{
+  "name": "syllabussync",
+  "private": true,
+  "description": "Monorepo root — the Vercel app lives in /frontend (see root vercel.json)."
+}
