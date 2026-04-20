@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Avatar,
   Box,
-  Chip,
   CircularProgress,
   Fade,
   IconButton,
@@ -15,7 +14,16 @@ import {
   SmartToy,
   Person,
   CalendarMonth,
+  AutoAwesome,
+  Add,
+  ExpandMore,
+  EventOutlined,
+  NotificationsActiveOutlined,
+  ViewWeekOutlined,
+  SearchOutlined,
+  MicNoneOutlined,
 } from '@mui/icons-material';
+import type { SvgIconComponent } from '@mui/icons-material';
 import { API_BASE_URL } from '../config/api.ts';
 
 export interface ChatMessage {
@@ -39,24 +47,36 @@ interface ChatPanelProps {
   pendingPrompt?: { text: string; id: string };
 }
 
-/* Claude-inspired dark chat: neutral charcoal surfaces, centered column, soft radii. */
-const BG = '#111111';
-const BG_ELEVATED = '#1a1a1a';
-const BORDER = 'rgba(255,255,255,0.09)';
-const BORDER_INPUT = 'rgba(255,255,255,0.12)';
-const TEXT = 'rgba(255,255,255,0.92)';
-const TEXT_MUTE = 'rgba(255,255,255,0.55)';
-const USER_BUBBLE = '#3f3f46';
-const ASSISTANT_BUBBLE = 'rgba(255,255,255,0.06)';
-const COLUMN_MAX = 680;
-const ACCENT_SEND = '#d97757';
+/** Cadence product palette (aligned with theme + landing). */
+const C = {
+  pageBg: '#07060d',
+  surface: 'rgba(20, 17, 39, 0.94)',
+  surfaceDeep: 'rgba(10, 9, 20, 0.75)',
+  border: 'rgba(139, 92, 246, 0.22)',
+  borderStrong: 'rgba(139, 92, 246, 0.38)',
+  borderInput: 'rgba(139, 92, 246, 0.28)',
+  purple: '#7c6cff',
+  purpleSoft: '#a08fff',
+  blue: '#3b82f6',
+  cyan: '#22d3ee',
+  text: 'rgba(255, 255, 255, 0.94)',
+  textMute: 'rgba(255, 255, 255, 0.58)',
+  gradient: 'linear-gradient(135deg, #7c6cff 0%, #6366f1 50%, #3b82f6 100%)',
+  userBubble:
+    'linear-gradient(135deg, rgba(124,108,255,0.38) 0%, rgba(59,130,246,0.22) 100%)',
+  botBubble: 'rgba(124, 108, 255, 0.09)',
+  serif: '"Fraunces", "Georgia", "Times New Roman", serif',
+  sans: '"Inter", "Space Grotesk", "Roboto", system-ui, sans-serif',
+};
+
+const COLUMN_MAX = 720;
 
 const defaultGreeting: ChatMessage[] = [
   {
     id: 'greet',
     text:
       "Hi — I'm Cadence, your AI day planner. Tell me what's on your mind and I'll slot it into your day. " +
-      "Try: ‘Remind me to call mom tomorrow at 6pm’, ‘Block 2 hours to focus Thursday morning’, or ‘What's on my plate this week?’",
+      "Try: ‘Remind me to call mom tomorrow at 6pm’, ‘Block 2 hours to focus Thursday morning’, or ‘What\u2019s on my plate this week?’",
     sender: 'bot',
     timestamp: new Date(),
   },
@@ -65,12 +85,19 @@ const defaultGreeting: ChatMessage[] = [
 const formatTime = (d: Date) =>
   d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+const SUGGESTION_ICONS: SvgIconComponent[] = [
+  EventOutlined,
+  NotificationsActiveOutlined,
+  ViewWeekOutlined,
+  SearchOutlined,
+];
+
 const ChatPanel: React.FC<ChatPanelProps> = ({
   suggestions = [
     'Plan my day tomorrow',
     'Remind me to pay rent on the 1st',
     'Block focus time Thursday 9–11am',
-    'What’s due this week?',
+    'What\u2019s due this week?',
   ],
   initialMessages = defaultGreeting,
   onReply,
@@ -84,6 +111,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const sentPendingRef = useRef<string | null>(null);
+
+  const userTurnCount = useMemo(
+    () => messages.filter((m) => m.sender === 'user').length,
+    [messages]
+  );
+
+  /** Claude-style empty state: serif hero only; greeting text moves out of the list. */
+  const showHeroEmpty =
+    messages.length === 1 &&
+    messages[0]?.id === 'greet' &&
+    userTurnCount === 0;
+
+  const listMessages = showHeroEmpty ? [] : messages;
 
   useEffect(() => {
     const el = messagesScrollRef.current;
@@ -161,15 +201,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   return (
     <Box
       sx={{
-        borderRadius: '16px',
-        border: `1px solid ${BORDER}`,
-        background: BG,
+        borderRadius: '20px',
+        border: `1px solid ${C.border}`,
+        background: `linear-gradient(165deg, ${C.surface} 0%, ${C.pageBg} 100%)`,
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         height,
         minHeight: 480,
-        boxShadow: '0 24px 80px -32px rgba(0,0,0,0.85)',
+        boxShadow:
+          '0 24px 80px -28px rgba(0,0,0,0.75), 0 0 0 1px rgba(124,108,255,0.06) inset',
+        fontFamily: C.sans,
       }}
     >
       {!hideHeader && (
@@ -177,22 +219,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           sx={{
             px: 2.5,
             py: 2,
-            borderBottom: `1px solid ${BORDER}`,
+            borderBottom: `1px solid ${C.border}`,
             display: 'flex',
             alignItems: 'center',
             gap: 2,
-            background: BG_ELEVATED,
+            background: 'rgba(124, 108, 255, 0.06)',
           }}
         >
           <Avatar
             sx={{
               width: 36,
               height: 36,
-              bgcolor: '#2a2a2a',
-              border: `1px solid ${BORDER}`,
+              background: C.gradient,
+              boxShadow: '0 8px 24px -12px rgba(124,108,255,0.7)',
             }}
           >
-            <SmartToy sx={{ fontSize: 20, color: TEXT_MUTE }} />
+            <SmartToy sx={{ fontSize: 20, color: '#fff' }} />
           </Avatar>
           <Box sx={{ flexGrow: 1 }}>
             <Typography
@@ -200,12 +242,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 fontWeight: 600,
                 fontSize: 15,
                 letterSpacing: '-0.02em',
-                color: TEXT,
+                color: C.text,
               }}
             >
               Cadence
             </Typography>
-            <Typography sx={{ color: TEXT_MUTE, fontSize: 12, mt: 0.25 }}>
+            <Typography sx={{ color: C.textMute, fontSize: 12, mt: 0.25 }}>
               Online · schedules, reminders, daily plans
             </Typography>
           </Box>
@@ -214,8 +256,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               width: 8,
               height: 8,
               borderRadius: 999,
-              background: '#4ade80',
-              opacity: 0.85,
+              background: C.cyan,
+              boxShadow: `0 0 10px ${C.cyan}`,
             }}
           />
         </Box>
@@ -229,7 +271,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               m: 2,
               borderRadius: '12px',
               bgcolor: 'rgba(127,29,29,0.35)',
-              border: '1px solid rgba(248,113,113,0.25)',
+              border: '1px solid rgba(244,114,182,0.35)',
             }}
             onClose={() => setError(null)}
           >
@@ -244,13 +286,73 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           flexGrow: 1,
           overflowY: 'auto',
           overscrollBehavior: 'contain',
-          py: 3,
+          py: showHeroEmpty ? 2 : 3,
           px: { xs: 2, sm: 3 },
           display: 'flex',
           flexDirection: 'column',
           gap: 2.5,
         }}
       >
+        {showHeroEmpty && (
+          <Box
+            sx={{
+              textAlign: 'center',
+              py: { xs: 2, sm: 4 },
+              px: 1,
+              maxWidth: COLUMN_MAX,
+              mx: 'auto',
+            }}
+          >
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1.5,
+                flexWrap: 'wrap',
+                mb: 1.5,
+              }}
+            >
+              <AutoAwesome
+                sx={{
+                  fontSize: { xs: 26, sm: 30 },
+                  color: C.purpleSoft,
+                  filter: 'drop-shadow(0 0 12px rgba(124,108,255,0.55))',
+                }}
+              />
+              <Typography
+                component="h2"
+                sx={{
+                  fontFamily: C.serif,
+                  fontWeight: 600,
+                  fontSize: { xs: 26, sm: 34, md: 38 },
+                  lineHeight: 1.15,
+                  letterSpacing: '-0.03em',
+                  background: C.gradient,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  color: 'transparent',
+                }}
+              >
+                What shall we plan today?
+              </Typography>
+            </Box>
+            <Typography
+              sx={{
+                color: C.textMute,
+                fontSize: 15,
+                lineHeight: 1.55,
+                maxWidth: 420,
+                mx: 'auto',
+              }}
+            >
+              Reminders, focus blocks, and Google Calendar sync — say it in plain
+              language below.
+            </Typography>
+          </Box>
+        )}
+
         <Box
           sx={{
             width: '100%',
@@ -261,7 +363,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             gap: 2.5,
           }}
         >
-          {messages.map((m) => (
+          {listMessages.map((m) => (
             <Fade in timeout={200} key={m.id}>
               <Box
                 sx={{
@@ -277,11 +379,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       width: 28,
                       height: 28,
                       mt: 0.25,
-                      bgcolor: '#2a2a2a',
-                      border: `1px solid ${BORDER}`,
+                      background: C.gradient,
+                      border: `1px solid ${C.border}`,
                     }}
                   >
-                    <SmartToy sx={{ fontSize: 15, color: TEXT_MUTE }} />
+                    <SmartToy sx={{ fontSize: 15, color: '#fff' }} />
                   </Avatar>
                 )}
 
@@ -292,16 +394,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       py: 1.75,
                       borderRadius: '18px',
                       background:
-                        m.sender === 'user' ? USER_BUBBLE : ASSISTANT_BUBBLE,
-                      color: TEXT,
-                      border:
-                        m.sender === 'bot'
-                          ? `1px solid ${BORDER}`
-                          : 'none',
+                        m.sender === 'user' ? C.userBubble : C.botBubble,
+                      color: C.text,
+                      border: `1px solid ${
+                        m.sender === 'bot' ? C.border : 'transparent'
+                      }`,
                       boxShadow:
-                        m.sender === 'user'
-                          ? 'none'
-                          : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                        m.sender === 'bot'
+                          ? 'inset 0 1px 0 rgba(124,108,255,0.12)'
+                          : '0 8px 28px -16px rgba(124,108,255,0.35)',
                     }}
                   >
                     <Typography
@@ -311,7 +412,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                         fontSize: 15,
                         letterSpacing: '-0.01em',
                         mb: m.taskCreated ? 2 : 0,
-                        color: TEXT,
+                        color: C.text,
                       }}
                     >
                       {m.text}
@@ -323,8 +424,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           mt: 2,
                           p: 1.75,
                           borderRadius: '12px',
-                          background: 'rgba(0,0,0,0.35)',
-                          border: `1px solid ${BORDER}`,
+                          background: 'rgba(10, 9, 20, 0.55)',
+                          border: `1px solid ${C.border}`,
                         }}
                       >
                         <Typography
@@ -337,16 +438,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             fontWeight: 600,
                             letterSpacing: '0.06em',
                             textTransform: 'uppercase',
-                            color: TEXT_MUTE,
+                            color: C.textMute,
                             fontSize: 10,
                           }}
                         >
-                          <CalendarMonth sx={{ fontSize: 14 }} />
+                          <CalendarMonth sx={{ fontSize: 14, color: C.cyan }} />
                           Added to your day
                         </Typography>
                         <Typography
                           variant="body2"
-                          sx={{ fontWeight: 600, mb: 0.75, color: TEXT }}
+                          sx={{ fontWeight: 600, mb: 0.75, color: C.text }}
                         >
                           {m.taskCreated.title}
                         </Typography>
@@ -358,18 +459,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             flexWrap: 'wrap',
                           }}
                         >
-                          <Chip
-                            label={m.taskCreated.type}
-                            size="small"
+                          <Box
+                            component="span"
                             sx={{
-                              bgcolor: 'rgba(255,255,255,0.08)',
-                              color: TEXT,
-                              border: `1px solid ${BORDER}`,
+                              display: 'inline-block',
+                              px: 1,
+                              py: 0.25,
+                              borderRadius: 999,
+                              bgcolor: 'rgba(124,108,255,0.2)',
+                              color: C.purpleSoft,
+                              border: `1px solid ${C.border}`,
                               fontSize: 11,
-                              fontWeight: 500,
+                              fontWeight: 600,
                             }}
-                          />
-                          <Typography variant="caption" sx={{ color: TEXT_MUTE }}>
+                          >
+                            {m.taskCreated.type}
+                          </Box>
+                          <Typography variant="caption" sx={{ color: C.textMute }}>
                             Due{' '}
                             {new Date(
                               m.taskCreated.dueDate + 'T00:00:00'
@@ -386,7 +492,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     <Typography
                       variant="caption"
                       sx={{
-                        opacity: 0.45,
+                        opacity: 0.5,
                         display: 'block',
                         mt: 1,
                         textAlign: 'right',
@@ -404,11 +510,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       width: 28,
                       height: 28,
                       mt: 0.25,
-                      bgcolor: USER_BUBBLE,
-                      border: `1px solid ${BORDER}`,
+                      bgcolor: 'rgba(124,108,255,0.25)',
+                      border: `1px solid ${C.border}`,
                     }}
                   >
-                    <Person sx={{ fontSize: 15, color: TEXT_MUTE }} />
+                    <Person sx={{ fontSize: 15, color: C.purpleSoft }} />
                   </Avatar>
                 )}
               </Box>
@@ -431,30 +537,29 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   sx={{
                     width: 28,
                     height: 28,
-                    bgcolor: '#2a2a2a',
-                    border: `1px solid ${BORDER}`,
+                    background: C.gradient,
                   }}
                 >
-                  <SmartToy sx={{ fontSize: 15, color: TEXT_MUTE }} />
+                  <SmartToy sx={{ fontSize: 15, color: '#fff' }} />
                 </Avatar>
                 <Box
                   sx={{
                     px: 2,
                     py: 1.5,
                     borderRadius: '18px',
-                    bgcolor: ASSISTANT_BUBBLE,
-                    border: `1px solid ${BORDER}`,
+                    bgcolor: C.botBubble,
+                    border: `1px solid ${C.border}`,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1.5,
                   }}
                 >
-                  <CircularProgress size={14} sx={{ color: TEXT_MUTE }} />
+                  <CircularProgress size={14} sx={{ color: C.purpleSoft }} />
                   <Typography
                     variant="body2"
-                    sx={{ color: TEXT_MUTE, fontSize: 14 }}
+                    sx={{ color: C.textMute, fontSize: 14 }}
                   >
-                    Thinking…
+                    Planning…
                   </Typography>
                 </Box>
               </Box>
@@ -477,60 +582,65 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             justifyContent: 'center',
           }}
         >
-          {suggestions.map((s) => (
-            <Box
-              key={s}
-              role="button"
-              tabIndex={0}
-              onClick={() => send(s)}
-              onKeyDown={(e) => (e.key === 'Enter' ? send(s) : undefined)}
-              sx={{
-                px: 1.5,
-                py: 0.65,
-                borderRadius: 999,
-                fontSize: 12.5,
-                fontWeight: 450,
-                color: TEXT_MUTE,
-                background: 'transparent',
-                border: `1px solid ${BORDER}`,
-                cursor: 'pointer',
-                transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease',
-                '&:hover': {
-                  background: 'rgba(255,255,255,0.05)',
-                  borderColor: 'rgba(255,255,255,0.18)',
-                  color: TEXT,
-                },
-              }}
-            >
-              {s}
-            </Box>
-          ))}
+          {suggestions.map((s, i) => {
+            const Icon = SUGGESTION_ICONS[i % SUGGESTION_ICONS.length];
+            return (
+              <Box
+                key={s}
+                role="button"
+                tabIndex={0}
+                onClick={() => send(s)}
+                onKeyDown={(e) => (e.key === 'Enter' ? send(s) : undefined)}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  px: 1.5,
+                  py: 0.65,
+                  borderRadius: 999,
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  color: C.textMute,
+                  background: 'transparent',
+                  border: `1px solid ${C.border}`,
+                  cursor: 'pointer',
+                  transition:
+                    'background 160ms ease, border-color 160ms ease, color 160ms ease',
+                  '&:hover': {
+                    background: 'rgba(124, 108, 255, 0.1)',
+                    borderColor: C.borderStrong,
+                    color: C.text,
+                  },
+                }}
+              >
+                <Icon sx={{ fontSize: 16, opacity: 0.85 }} />
+                {s}
+              </Box>
+            );
+          })}
         </Box>
       )}
 
+      {/* Claude-style composer: main input + bottom toolbar (Cadence colors). */}
       <Box
         sx={{
           p: 2,
-          borderTop: `1px solid ${BORDER}`,
-          background: BG_ELEVATED,
+          borderTop: `1px solid ${C.border}`,
+          background: 'rgba(10, 9, 20, 0.65)',
         }}
       >
         <Box
           sx={{
             maxWidth: COLUMN_MAX,
             mx: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1.25,
             borderRadius: '16px',
-            border: `1px solid ${BORDER_INPUT}`,
-            bgcolor: '#0c0c0c',
-            p: 1.25,
-            pl: 1.75,
+            border: `1px solid ${C.borderInput}`,
+            bgcolor: C.surfaceDeep,
+            overflow: 'hidden',
             transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
             '&:focus-within': {
-              borderColor: 'rgba(255,255,255,0.22)',
-              boxShadow: '0 0 0 1px rgba(255,255,255,0.06)',
+              borderColor: C.borderStrong,
+              boxShadow: '0 0 0 3px rgba(124, 108, 255, 0.12)',
             },
           }}
         >
@@ -547,15 +657,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             InputProps={{
               disableUnderline: true,
               sx: {
-                color: TEXT,
+                color: C.text,
                 fontSize: 15,
                 lineHeight: 1.55,
                 letterSpacing: '-0.01em',
+                px: 2,
+                pt: 1.75,
+                pb: 1,
               },
             }}
             sx={{
               '& .MuiInputBase-input::placeholder': {
-                color: TEXT_MUTE,
+                color: C.textMute,
                 opacity: 1,
               },
             }}
@@ -563,10 +676,66 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           <Box
             sx={{
               display: 'flex',
-              justifyContent: 'flex-end',
               alignItems: 'center',
+              gap: 1,
+              px: 1.25,
+              py: 1,
+              borderTop: `1px solid ${C.border}`,
+              background: 'rgba(124, 108, 255, 0.04)',
             }}
           >
+            <IconButton
+              size="small"
+              aria-label="Add"
+              sx={{
+                color: C.textMute,
+                flexShrink: 0,
+                '&:hover': { color: C.purpleSoft, bgcolor: 'rgba(124,108,255,0.1)' },
+              }}
+            >
+              <Add fontSize="small" />
+            </IconButton>
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.75,
+                minWidth: 0,
+              }}
+            >
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.25,
+                  px: 1.25,
+                  py: 0.45,
+                  borderRadius: 999,
+                  border: `1px solid ${C.border}`,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: C.textMute,
+                  bgcolor: 'rgba(20,17,39,0.65)',
+                }}
+              >
+                Day planner
+                <ExpandMore sx={{ fontSize: 18, opacity: 0.75 }} />
+              </Box>
+              <IconButton
+                size="small"
+                aria-label="Voice (coming soon)"
+                disabled
+                sx={{
+                  color: C.textMute,
+                  display: { xs: 'none', sm: 'inline-flex' },
+                  opacity: 0.45,
+                }}
+              >
+                <MicNoneOutlined sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Box>
             <IconButton
               onClick={() => send()}
               disabled={!inputText.trim() || loading}
@@ -574,18 +743,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               sx={{
                 width: 36,
                 height: 36,
+                flexShrink: 0,
                 borderRadius: '10px',
                 color: '#fff',
-                bgcolor: ACCENT_SEND,
-                transition: 'opacity 0.2s ease, transform 0.15s ease',
+                background: C.gradient,
+                boxShadow: '0 8px 20px -8px rgba(124,108,255,0.8)',
                 '&:hover': {
-                  bgcolor: '#e88f6f',
-                  transform: 'translateY(-1px)',
+                  filter: 'brightness(1.08)',
+                  boxShadow: '0 10px 24px -8px rgba(124,108,255,0.95)',
                 },
                 '&:disabled': {
-                  bgcolor: 'rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.08)',
                   color: 'rgba(255,255,255,0.25)',
-                  transform: 'none',
+                  boxShadow: 'none',
                 },
               }}
             >
