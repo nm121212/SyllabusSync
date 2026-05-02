@@ -24,6 +24,22 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Browser navigations for Google OAuth must not inherit any stale Bearer token —
+     * e.g. an old Supabase or expired JWT in localStorage that the fetch interceptor
+     * injected. Parsing those failures would leave SecurityContext unauthenticated while
+     * {@code Authorization} stays set and can confuse downstream handlers.
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path == null) {
+            return false;
+        }
+        return path.startsWith("/api/auth/google/")
+                || path.startsWith("/api/syllabus/auth/google/");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,

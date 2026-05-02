@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Persists tasks per authenticated Supabase user ({@code userId} = JWT {@code sub}) via JPA / Postgres.
+ * Persists tasks per authenticated user ({@code userId} = Google JWT subject / app JWT subject) via JPA / Postgres.
  */
 @Service
 public class TaskService {
@@ -124,7 +124,7 @@ public class TaskService {
 
     @Transactional
     public void deleteTask(String userId, Long taskId) {
-        taskRepository.findByIdAndUser_SupabaseSub(taskId, userId).ifPresent(taskRepository::delete);
+        taskRepository.findByIdAndUser_GoogleSub(taskId, userId).ifPresent(taskRepository::delete);
     }
 
     @Transactional
@@ -134,7 +134,7 @@ public class TaskService {
 
     @Transactional
     public Task updateTask(String userId, Long taskId, Map<String, Object> updates) {
-        Task task = taskRepository.findByIdAndUser_SupabaseSub(taskId, userId)
+        Task task = taskRepository.findByIdAndUser_GoogleSub(taskId, userId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
 
         if (updates.containsKey("title")) {
@@ -180,7 +180,7 @@ public class TaskService {
         task.setCourse(course);
 
         if (task.getId() != null) {
-            return taskRepository.findByIdAndUser_SupabaseSub(task.getId(), userId)
+            return taskRepository.findByIdAndUser_GoogleSub(task.getId(), userId)
                     .map(existing -> {
                         copyMutableFields(task, existing);
                         return taskRepository.save(existing);
