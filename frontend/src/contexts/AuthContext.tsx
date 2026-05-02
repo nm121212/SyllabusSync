@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { API_BASE_URL } from '../config/api.ts';
 
 const TOKEN_KEY = 'syllabussync_token';
 
@@ -78,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
 
-    fetch('/api/auth/me', {
+    fetch(`${API_BASE_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -107,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const signInWithGoogle = useCallback(async (): Promise<void> => {
-    window.location.href = '/api/auth/google/login';
+    window.location.href = `${API_BASE_URL}/auth/google/login`;
   }, []);
 
   const signOut = useCallback(async (): Promise<void> => {
